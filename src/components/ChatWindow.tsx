@@ -31,7 +31,7 @@ const ChatWindow = ({ messages, onSubmit, thinking }: ChatWindowProps) => {
         {messages.map((msg, i) => (
           <div
             key={i}
-            className={`px-3 py-2 rounded max-w-[90%] ${msg.sender === "You" ? "bg-blue-700 self-end text-right" : "bg-zinc-700 self-start"
+            className={`px-3 py-2 rounded max-w-[90%] ${msg.sender === "You" ? "bg-blue-700 self-end text-right" : "bg-gray-900 self-start"
               }`}
           >
             <span className="block text-sm">{msg.text}</span>
@@ -41,7 +41,7 @@ const ChatWindow = ({ messages, onSubmit, thinking }: ChatWindowProps) => {
         <div ref={bottomRef} />
         {/* Thinking indicator */}
         {thinking && (
-          <div className="px-3 py-2 rounded max-w-[90%] bg-zinc-700 self-start animate-pulse text-sm text-zinc-300">
+          <div className="px-3 py-2 rounded max-w-[90%] bg-gray-900 self-start animate-pulse text-sm text-zinc-300">
             Thinking...
           </div>
         )}
@@ -51,7 +51,7 @@ const ChatWindow = ({ messages, onSubmit, thinking }: ChatWindowProps) => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          className="flex-1 bg-zinc-700 text-white p-2 rounded"
+          className="flex-1 bg-gray-900 text-white p-2 rounded"
           placeholder="Ask a question..."
         />
         <button onClick={handleSend} className="btn">

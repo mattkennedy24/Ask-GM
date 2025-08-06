@@ -15,7 +15,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onAnalyze, onReset }) => {
           Analyze Position
         </button>
         <button
-          className="px-6 py-2 rounded-lg bg-zinc-700 text-white font-semibold hover:bg-zinc-800 transition-colors duration-200 shadow"
+          className="px-6 py-2 rounded-lg bg-gray-900 text-white font-semibold hover:bg-zinc-800 transition-colors duration-200 shadow"
           onClick={onReset}
         >
           Reset
