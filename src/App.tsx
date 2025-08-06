@@ -46,7 +46,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col md:flex-row gap-4">
+      <div className="min-h-screen bg-zinc-900 text-white p-4 flex flex-col md:flex-row gap-4">
       <div className="flex-1 flex flex-col items-center">
         <h1 className="text-3xl font-bold mb-2">Ask GM ♟️</h1>
         <PersonalitySelector selected={selectedGM} onSelect={setSelectedGM} />
