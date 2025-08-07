@@ -23,7 +23,7 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
   disableForward,
 }) => {
   return (
-    <div className="border-4 border-gray-600 rounded-xl p-4 shadow-xl bg-gray-800 w-full max-w-[480px]">
+      <div className="border-4 border-zinc-600 rounded-xl p-4 shadow-xl bg-zinc-800 w-full max-w-[480px]">
       <ChessBoard position={position} onMove={onMove} />
       <div className="flex justify-between mt-4 gap-2">
         <button onClick={onBack} className="btn">← Back</button>
