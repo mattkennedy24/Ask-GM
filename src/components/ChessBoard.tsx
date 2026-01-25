@@ -3,7 +3,7 @@ import { Chessboard } from "react-chessboard";
 
 interface ChessBoardProps {
   position: string;
-  onMove: (from: string, to: string) => void;
+  onMove: (from: string, to: string) => boolean;
   onFenChange?: (fen: string) => void;
 }
 
@@ -14,8 +14,7 @@ const ChessBoard: React.FC<ChessBoardProps> = ({ position, onMove }) => {
     <Chessboard
       position={position}
       onPieceDrop={(sourceSquare, targetSquare) => {
-        onMove(sourceSquare, targetSquare);
-        return true;
+        return onMove(sourceSquare, targetSquare);
       }}
     />
     </div>
@@ -23,4 +22,3 @@ const ChessBoard: React.FC<ChessBoardProps> = ({ position, onMove }) => {
 };
 
 export default ChessBoard;
-

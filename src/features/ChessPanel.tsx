@@ -3,7 +3,7 @@ import ChessBoard from "../components/ChessBoard";
 
 interface ChessPanelProps {
   position: string;
-  onMove: (from: string, to: string) => void;
+  onMove: (from: string, to: string) => boolean;
   onBack: () => void;
   onForward: () => void;
   onUndo: () => void;
