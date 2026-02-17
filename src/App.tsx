@@ -112,7 +112,7 @@ function App() {
       <div className="flex-1 flex flex-col items-center">
         <h1 className="text-3xl font-bold mb-2">Ask GM ♟️</h1>
         <PersonalitySelector selected={selectedGM} onSelect={setSelectedGM} />
-        <div className="w-full max-w-[480px]">
+        <div className="w-full max-w-[620px]">
           <ChessPanel
             position={currentFen}
             onMove={handleMove}
