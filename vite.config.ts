@@ -1,9 +1,19 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import path from "path";
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      // stockfish v16 has an incorrect "main" in package.json — point directly
+      // to the no-SIMD variant for broadest browser compatibility.
+      stockfish: path.resolve(
+        "./node_modules/stockfish/src/stockfish-nnue-16-no-simd.js",
+      ),
+    },
+  },
   server: {
     // Proxy /api requests to the Express backend during development
     proxy: {
@@ -13,9 +23,6 @@ export default defineConfig({
       },
     },
   },
-  // The stockfish WASM package doesn't have proper ESM exports for Rollup.
-  // Exclude it from the bundle — the useStockfish hook loads it dynamically
-  // and falls back to the Lichess cloud eval API if it fails.
   build: {
     rollupOptions: {
       external: ["stockfish"],

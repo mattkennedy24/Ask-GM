@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
+import type { Arrow, Square } from "react-chessboard/dist/chessboard/types";
 import PersonalitySelector from "./components/PersonalitySelector";
 import ChatWindow from "./components/ChatWindow";
 import ChessPanel from "./features/ChessPanel";
@@ -19,7 +20,10 @@ async function askGM(payload: {
 }): Promise<string> {
   const res = await fetch("/api/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Beta-Key": localStorage.getItem("betaKey") ?? "",
+    },
     body: JSON.stringify(payload),
   });
 
@@ -42,6 +46,15 @@ function App() {
   const [history, setHistory] = useState([chessRef.current.fen()]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [currentFen, setCurrentFen] = useState(chessRef.current.fen());
+  const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
+
+  // Prompt for beta access key on first visit
+  useEffect(() => {
+    if (!localStorage.getItem("betaKey")) {
+      const key = window.prompt("Enter beta access code:");
+      if (key) localStorage.setItem("betaKey", key);
+    }
+  }, []);
 
   // Stockfish analysis (local WASM with Lichess fallback)
   const {
@@ -55,6 +68,23 @@ function App() {
     analyzePosition(currentFen);
   }, [currentFen, analyzePosition]);
 
+  const derivedChess = useMemo(() => new Chess(currentFen), [currentFen]);
+  const inCheck = derivedChess.inCheck();
+
+  const kingInCheckSquare = useMemo((): string | null => {
+    if (!inCheck) return null;
+    const squares = derivedChess.findPiece({ type: "k", color: derivedChess.turn() });
+    return squares.length > 0 ? squares[0] : null;
+  }, [derivedChess, inCheck]);
+
+  const engineArrow = useMemo((): Arrow | null => {
+    if (!bestMove || bestMove.length < 4) return null;
+    const from = bestMove.slice(0, 2);
+    const to = bestMove.slice(2, 4);
+    if (!/^[a-h][1-8]$/.test(from) || !/^[a-h][1-8]$/.test(to)) return null;
+    return [from as Square, to as Square, "rgba(0, 160, 0, 0.8)"];
+  }, [bestMove]);
+
   const loadFenAt = useCallback(
     (index: number) => {
       const boundedIndex = Math.min(Math.max(index, 0), history.length - 1);
@@ -62,15 +92,17 @@ function App() {
       chessRef.current.load(fen);
       setHistoryIndex(boundedIndex);
       setCurrentFen(fen);
+      setLastMove(null);
     },
     [history],
   );
 
-  const handleMove = (from: string, to: string) => {
-    const move = chessRef.current.move({ from, to, promotion: "q" });
+  const handleMove = (from: string, to: string, promotion?: string) => {
+    const move = chessRef.current.move({ from, to, promotion: promotion ?? "q" });
     if (!move) {
       return false;
     }
+    setLastMove({ from, to });
     const fen = chessRef.current.fen();
     const nextHistory = history.slice(0, historyIndex + 1).concat(fen);
     setHistory(nextHistory);
@@ -185,6 +217,10 @@ function App() {
             onAsk={handleQuickAsk}
             selectedGM={selectedGM}
             disableForward={historyIndex >= history.length - 1}
+            lastMove={lastMove}
+            inCheck={inCheck}
+            kingInCheckSquare={kingInCheckSquare}
+            engineArrow={engineArrow}
           />
           {/* Stockfish analysis indicator */}
           {bestMove && (
