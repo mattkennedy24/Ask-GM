@@ -2,13 +2,33 @@ import express from "express";
 import cors from "cors";
 import Anthropic from "@anthropic-ai/sdk";
 import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import path from "path";
 import gmPersonalities from "./gmPersonalities.js";
 
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const betaMiddleware = (req, res, next) => {
+  const passcode = process.env.BETA_PASSCODE;
+  if (!passcode) return next(); // disabled in local dev if env var not set
+  const provided = req.headers["x-beta-key"];
+  if (provided !== passcode) {
+    return res.status(401).json({ error: "Beta access required" });
+  }
+  next();
+};
+app.use("/api", betaMiddleware);
+
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../dist")));
+}
 
 // Validate API key on startup
 if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === "your-api-key-here") {
@@ -111,6 +131,12 @@ app.post("/api/chat", async (req, res) => {
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", hasApiKey: !!process.env.ANTHROPIC_API_KEY });
 });
+
+if (process.env.NODE_ENV === "production") {
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(__dirname, "../dist", "index.html"));
+  });
+}
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

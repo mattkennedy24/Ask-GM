@@ -20,7 +20,10 @@ async function askGM(payload: {
 }): Promise<string> {
   const res = await fetch("/api/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Beta-Key": localStorage.getItem("betaKey") ?? "",
+    },
     body: JSON.stringify(payload),
   });
 
@@ -44,6 +47,14 @@ function App() {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [currentFen, setCurrentFen] = useState(chessRef.current.fen());
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
+
+  // Prompt for beta access key on first visit
+  useEffect(() => {
+    if (!localStorage.getItem("betaKey")) {
+      const key = window.prompt("Enter beta access code:");
+      if (key) localStorage.setItem("betaKey", key);
+    }
+  }, []);
 
   // Stockfish analysis (local WASM with Lichess fallback)
   const {
