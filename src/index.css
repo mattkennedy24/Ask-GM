@@ -1,7 +1,124 @@
 @import "tailwindcss";
 
+:root {
+  /* ── Backgrounds ── */
+  --c-bg:       #09090F;   /* deepest — page base */
+  --c-surface:  #0F0F18;   /* card surfaces */
+  --c-raised:   #161622;   /* inputs, elevated elements */
+  --c-hover:    #1E1E2C;   /* hover state */
+
+  /* ── Borders ── */
+  --c-border:       #1C1C2C;
+  --c-border-mid:   #262638;
+  --c-border-bright:#323248;
+
+  /* ── Gold accent — brass lamp in a mahogany study ── */
+  --c-gold:       #C89040;
+  --c-gold-bright:#E4A84C;
+  --c-gold-dim:   rgba(200, 144, 64, 0.14);
+  --c-gold-glow:  rgba(200, 144, 64, 0.08);
+
+  /* ── Interactive blue ── */
+  --c-blue:     #4674E8;
+  --c-blue-dim: rgba(70, 116, 232, 0.12);
+
+  /* ── Engine line colors — tactical beams ── */
+  --c-line1:        #38C87A;
+  --c-line1-bg:     rgba(56, 200, 122, 0.07);
+  --c-line1-border: rgba(56, 200, 122, 0.20);
+
+  --c-line2:        #E89C20;
+  --c-line2-bg:     rgba(232, 156, 32, 0.06);
+  --c-line2-border: rgba(232, 156, 32, 0.18);
+
+  --c-line3:        #6880A4;
+  --c-line3-bg:     rgba(104, 128, 164, 0.05);
+  --c-line3-border: rgba(104, 128, 164, 0.15);
+
+  /* ── GM identity colors ── */
+  --c-gm-magnus: #4674E8;
+  --c-gm-hikaru: #E87C20;
+  --c-gm-bobby:  #C84848;
+
+  /* ── Text ── */
+  --c-text:       #DDD8CF;
+  --c-text-soft:  #8A8898;
+  --c-text-muted: #4C4A5C;
+
+  /* ── Typography ── */
+  --f-serif: 'Cormorant Garamond', Georgia, serif;
+  --f-mono:  'JetBrains Mono', 'Fira Code', monospace;
+  --f-sans:  'DM Sans', system-ui, sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--f-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Refined scrollbars ── */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-border-bright); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--c-gold); }
+
+/* ── Base component classes ── */
 @layer components {
   .btn {
-    @apply rounded-lg bg-zinc-700 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed;
+    @apply rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap;
+    background: var(--c-raised);
+    border: 1px solid var(--c-border-bright);
+    color: var(--c-text);
+    font-family: var(--f-sans);
+    letter-spacing: 0.01em;
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--c-hover);
+    border-color: var(--c-gold);
+    color: var(--c-gold-bright);
+  }
+  .btn:focus-visible {
+    outline: 1px solid var(--c-gold);
+    outline-offset: 2px;
+  }
+  .btn-primary {
+    @apply rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap;
+    background: var(--c-gold-dim);
+    border: 1px solid var(--c-gold);
+    color: var(--c-gold-bright);
+    font-family: var(--f-sans);
+    letter-spacing: 0.01em;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: rgba(200, 144, 64, 0.22);
+  }
+
+  .panel {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 0.875rem;
   }
 }
+
+/* ── Thinking animation ── */
+@keyframes thinking-pulse {
+  0%, 100% { opacity: 0.3; transform: scaleY(0.6); }
+  50%       { opacity: 1;   transform: scaleY(1.0); }
+}
+.thinking-bar {
+  animation: thinking-pulse 1.2s ease-in-out infinite;
+}
+.thinking-bar:nth-child(2) { animation-delay: 0.15s; }
+.thinking-bar:nth-child(3) { animation-delay: 0.30s; }

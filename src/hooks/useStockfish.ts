@@ -1,54 +1,45 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 
-export type EvalResult = {
-  bestMove: string | null;
-  /** Centipawns from white's perspective, or ±9999 for forced mate. Null if unknown. */
-  evalScore: number | null;
-  /** "M3" / "M-3" etc when a forced mate is found, otherwise null. */
-  mateIn: number | null;
-  /** Full PV line as UCI moves (e.g. ["e2e4", "e7e5", ...]). */
-  pvLine: string[];
+export type EngineLineResult = {
+  pv: string[];
+  score: number | null;
+  mate: number | null;
 };
 
+const MULTI_PV = 3;
+
 /**
- * Lichess cloud evaluation API.
- * Free, no API key. Returns best move, eval, and PV.
- * https://lichess.org/api#tag/Analysis/operation/apiCloudEval
+ * Lichess cloud evaluation API — returns top N lines.
  */
-async function fetchLichessEval(fen: string): Promise<EvalResult> {
-  const empty: EvalResult = { bestMove: null, evalScore: null, mateIn: null, pvLine: [] };
+async function fetchLichessEval(fen: string): Promise<EngineLineResult[]> {
   try {
     const encoded = encodeURIComponent(fen);
     const res = await fetch(
-      `https://lichess.org/api/cloud-eval?fen=${encoded}&multiPv=1`
+      `https://lichess.org/api/cloud-eval?fen=${encoded}&multiPv=${MULTI_PV}`
     );
-    if (!res.ok) return empty;
+    if (!res.ok) return [];
     const data = await res.json();
-    if (!data.pvs || data.pvs.length === 0) return empty;
+    if (!data.pvs || data.pvs.length === 0) return [];
 
-    const pv = data.pvs[0];
-    const pvLine: string[] = pv.moves ? pv.moves.split(" ") : [];
-    const bestMove = pvLine[0] ?? null;
-
-    let evalScore: number | null = null;
-    let mateIn: number | null = null;
-
-    if (pv.cp !== undefined) {
-      evalScore = pv.cp;
-    } else if (pv.mate !== undefined) {
-      mateIn = pv.mate;
-      evalScore = pv.mate > 0 ? 9999 : -9999;
-    }
-
-    return { bestMove, evalScore, mateIn, pvLine };
+    return data.pvs.map((pv: { moves?: string; cp?: number; mate?: number }) => {
+      const pvLine: string[] = pv.moves ? pv.moves.split(" ") : [];
+      let score: number | null = null;
+      let mate: number | null = null;
+      if (pv.cp !== undefined) score = pv.cp;
+      else if (pv.mate !== undefined) {
+        mate = pv.mate;
+        score = pv.mate > 0 ? 9999 : -9999;
+      }
+      return { pv: pvLine, score, mate };
+    });
   } catch {
-    return empty;
+    return [];
   }
 }
 
 /**
  * Parse a Stockfish WASM "info" line for score and PV.
- * Example: "info depth 20 ... score cp 35 ... pv e2e4 e7e5 g1f3"
+ * Example: "info depth 20 multipv 1 score cp 35 ... pv e2e4 e7e5 g1f3"
  */
 function parseInfoLine(msg: string): { score: number | null; mate: number | null; pv: string[] } {
   let score: number | null = null;
@@ -71,20 +62,20 @@ function parseInfoLine(msg: string): { score: number | null; mate: number | null
 
 export function useStockfish() {
   const stockfishRef = useRef<{ postMessage: (msg: string) => void; terminate?: () => void } | null>(null);
-  const [bestMove, setBestMove] = useState<string | null>(null);
-  const [evalScore, setEvalScore] = useState<number | null>(null);
-  const [mateIn, setMateIn] = useState<number | null>(null);
-  const [pvLine, setPvLine] = useState<string[]>([]);
+  const [topLines, setTopLines] = useState<EngineLineResult[]>([]);
   const [thinking, setThinking] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
   const wasmFailed = useRef(false);
 
-  // Accumulate the best info line seen during WASM analysis
-  const bestInfoRef = useRef<{ score: number | null; mate: number | null; pv: string[] }>({
-    score: null,
-    mate: null,
-    pv: [],
-  });
+  // Per-multipv accumulator: key = multipv index (1-based)
+  const bestInfoMapRef = useRef<Map<number, { score: number | null; mate: number | null; pv: string[] }>>(new Map());
+
+  // Backwards-compatible derived values from topLines[0]
+  const firstLine = topLines[0] ?? null;
+  const bestMove = firstLine?.pv[0] ?? null;
+  const evalScore = firstLine?.score ?? null;
+  const mateIn = firstLine?.mate ?? null;
+  const pvLine = firstLine?.pv ?? [];
 
   useEffect(() => {
     if (wasmFailed.current) return;
@@ -95,27 +86,34 @@ export function useStockfish() {
           try {
             const sf = mod.default();
             sf.onmessage = (event: string | { data: string }) => {
-              const msg: string =
-                typeof event === "string" ? event : (event?.data ?? "");
-
+              const msg: string = typeof event === "string" ? event : (event?.data ?? "");
               if (typeof msg !== "string") return;
 
-              // Collect best analysis from info lines (track last best-depth info)
               if (msg.startsWith("info") && msg.includes("score")) {
+                // Extract which PV line this info belongs to (defaults to 1 when MultiPV not set)
+                const multipvMatch = msg.match(/\bmultipv (\d+)/);
+                const multipvIdx = multipvMatch ? parseInt(multipvMatch[1], 10) : 1;
                 const parsed = parseInfoLine(msg);
-                // Only update if we got a score (avoids resetting on lowerbound lines)
                 if (parsed.score !== null || parsed.mate !== null) {
-                  bestInfoRef.current = parsed;
+                  bestInfoMapRef.current.set(multipvIdx, parsed);
                 }
               }
 
               if (msg.startsWith("bestmove")) {
                 const move = msg.split(" ")[1];
-                const info = bestInfoRef.current;
-                setBestMove(move === "(none)" ? null : (move ?? null));
-                setEvalScore(info.score);
-                setMateIn(info.mate);
-                setPvLine(info.pv.length > 0 ? info.pv : move ? [move] : []);
+                const map = bestInfoMapRef.current;
+
+                const lines: EngineLineResult[] = Array.from(map.entries())
+                  .sort(([a], [b]) => a - b)
+                  .map(([, info]) => ({ score: info.score, mate: info.mate, pv: info.pv }))
+                  .filter((l) => l.pv.length > 0);
+
+                // Fallback: if map is empty, at least use the bestmove
+                if (lines.length === 0 && move && move !== "(none)") {
+                  lines.push({ score: null, mate: null, pv: [move] });
+                }
+
+                setTopLines(lines);
                 setThinking(false);
               }
             };
@@ -147,30 +145,23 @@ export function useStockfish() {
 
   const analyzePosition = useCallback(async (fen: string, depth = 18) => {
     setThinking(true);
-    setBestMove(null);
-    setEvalScore(null);
-    setMateIn(null);
-    setPvLine([]);
-    bestInfoRef.current = { score: null, mate: null, pv: [] };
+    setTopLines([]);
+    bestInfoMapRef.current = new Map();
 
-    // Try local WASM engine first
     if (stockfishRef.current && !wasmFailed.current) {
       stockfishRef.current.postMessage("stop");
       stockfishRef.current.postMessage("ucinewgame");
+      stockfishRef.current.postMessage(`setoption name MultiPV value ${MULTI_PV}`);
       stockfishRef.current.postMessage(`position fen ${fen}`);
       stockfishRef.current.postMessage(`go depth ${depth}`);
-      return; // Result arrives via onmessage callback
+      return;
     }
 
-    // Fallback to Lichess cloud evaluation
     setUsingFallback(true);
-    const result = await fetchLichessEval(fen);
-    setBestMove(result.bestMove);
-    setEvalScore(result.evalScore);
-    setMateIn(result.mateIn);
-    setPvLine(result.pvLine);
+    const lines = await fetchLichessEval(fen);
+    setTopLines(lines);
     setThinking(false);
   }, []);
 
-  return { bestMove, evalScore, mateIn, pvLine, analyzePosition, thinking, usingFallback };
+  return { bestMove, evalScore, mateIn, pvLine, topLines, analyzePosition, thinking, usingFallback };
 }
