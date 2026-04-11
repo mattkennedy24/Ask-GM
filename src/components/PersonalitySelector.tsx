@@ -1,6 +1,10 @@
 import React from "react";
 
-const personalities = ["Magnus", "Hikaru", "Bobby"];
+const PERSONALITIES = [
+  { name: "Magnus", color: "var(--c-gm-magnus)", short: "Magnus" },
+  { name: "Hikaru", color: "var(--c-gm-hikaru)", short: "Hikaru" },
+  { name: "Bobby",  color: "var(--c-gm-bobby)",  short: "Bobby"  },
+];
 
 interface PersonalitySelectorProps {
   selected: string;
@@ -9,22 +13,33 @@ interface PersonalitySelectorProps {
 
 const PersonalitySelector: React.FC<PersonalitySelectorProps> = ({ selected, onSelect }) => {
   return (
-    <div className="flex flex-col items-center gap-2 mb-4 w-full max-w-[320px]">
-      <label className="text-sm font-semibold text-zinc-300" htmlFor="gm-selector">
-        Select GM Persona
-      </label>
-      <select
-        id="gm-selector"
-        className="w-full rounded-lg bg-gray-900 text-white px-4 py-2 border border-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        value={selected}
-        onChange={(event) => onSelect(event.target.value)}
-      >
-        {personalities.map((name) => (
-          <option key={name} value={name}>
-            {name}
-          </option>
-        ))}
-      </select>
+    <div className="flex items-center gap-1">
+      {PERSONALITIES.map(({ name, color, short }) => {
+        const isActive = selected === name;
+        return (
+          <button
+            key={name}
+            onClick={() => onSelect(name)}
+            className="relative px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 focus:outline-none"
+            style={{
+              background: isActive ? `${color}18` : "transparent",
+              border: `1px solid ${isActive ? color : "var(--c-border-mid)"}`,
+              color: isActive ? color : "var(--c-text-soft)",
+              fontFamily: "var(--f-sans)",
+              letterSpacing: "0.01em",
+            }}
+            title={`Switch to ${name}`}
+          >
+            {short}
+            {isActive && (
+              <span
+                className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
+                style={{ background: color }}
+              />
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 };

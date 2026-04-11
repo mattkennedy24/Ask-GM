@@ -16,6 +16,7 @@ interface ChessBoardProps {
   inCheck: boolean;
   kingInCheckSquare: string | null;
   engineArrow: Arrow | null;
+  animationDuration?: number;
 }
 
 const ChessBoard: React.FC<ChessBoardProps> = ({
@@ -25,6 +26,7 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   inCheck,
   kingInCheckSquare,
   engineArrow,
+  animationDuration = 200,
 }) => {
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [legalMoveSquares, setLegalMoveSquares] = useState<string[]>([]);
@@ -34,7 +36,6 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
     to: Square;
   } | null>(null);
 
-  // Clear selection and pending promotion when position changes
   useEffect(() => {
     setSelectedSquare(null);
     setLegalMoveSquares([]);
@@ -45,43 +46,33 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
     const chess = new Chess(position);
     const styles: Partial<Record<Square, Record<string, string | number>>> = {};
 
-    // 1. Last move highlight (amber) — lowest priority
     if (lastMove) {
-      styles[lastMove.from as Square] = {
-        backgroundColor: "rgba(255, 170, 0, 0.4)",
-      };
-      styles[lastMove.to as Square] = {
-        backgroundColor: "rgba(255, 170, 0, 0.4)",
-      };
+      styles[lastMove.from as Square] = { backgroundColor: "rgba(205, 165, 0, 0.35)" };
+      styles[lastMove.to as Square]   = { backgroundColor: "rgba(205, 165, 0, 0.35)" };
     }
 
-    // 2. Selected square (blue)
     if (selectedSquare) {
-      styles[selectedSquare] = { backgroundColor: "rgba(20, 85, 255, 0.5)" };
+      styles[selectedSquare] = { backgroundColor: "rgba(70, 116, 232, 0.45)" };
     }
 
-    // 3. Legal move squares (dot for empty, ring for capture)
     for (const sq of legalMoveSquares) {
       const occupied = chess.get(sq as Square);
       if (occupied) {
         styles[sq as Square] = {
           ...styles[sq as Square],
-          background:
-            "radial-gradient(circle, transparent 55%, rgba(20, 85, 30, 0.65) 55%)",
+          background: "radial-gradient(circle, transparent 55%, rgba(56, 200, 122, 0.55) 55%)",
         };
       } else {
         styles[sq as Square] = {
           ...styles[sq as Square],
-          background:
-            "radial-gradient(circle, rgba(20, 85, 30, 0.65) 26%, transparent 26%)",
+          background: "radial-gradient(circle, rgba(56, 200, 122, 0.55) 26%, transparent 26%)",
         };
       }
     }
 
-    // 4. Check highlight (red) — highest priority, fully replaces prior styles
     if (inCheck && kingInCheckSquare) {
       styles[kingInCheckSquare as Square] = {
-        background: "rgba(220, 30, 30, 0.7)",
+        background: "radial-gradient(circle, rgba(220, 40, 40, 0.85) 0%, rgba(220, 40, 40, 0.4) 70%, transparent 100%)",
       };
     }
 
@@ -91,15 +82,12 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   const mergedArrows = useMemo((): Arrow[] => {
     const arrows: Arrow[] = [...userArrows];
     if (engineArrow) {
-      const dup = userArrows.some(
-        (a) => a[0] === engineArrow[0] && a[1] === engineArrow[1]
-      );
+      const dup = userArrows.some((a) => a[0] === engineArrow[0] && a[1] === engineArrow[1]);
       if (!dup) arrows.push(engineArrow);
     }
     return arrows;
   }, [userArrows, engineArrow]);
 
-  // Select a square and compute its legal move targets. Returns true if selection succeeded.
   const selectSquare = useCallback(
     (square: Square): boolean => {
       const chess = new Chess(position);
@@ -127,9 +115,7 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
         return;
       }
 
-      // A square is already selected
       if (legalMoveSquares.includes(square)) {
-        // Legal move target — check for promotion
         const piece = chess.get(selectedSquare);
         const isPromotion =
           piece?.type === "p" &&
@@ -146,7 +132,6 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
         return;
       }
 
-      // Not a legal target — re-select if own piece, otherwise deselect
       const clickedPiece = chess.get(square);
       if (clickedPiece && clickedPiece.color === chess.turn()) {
         selectSquare(square);
@@ -160,16 +145,12 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   );
 
   const handlePieceDrop = useCallback(
-    (sourceSquare: Square, targetSquare: Square): boolean => {
-      return onMove(sourceSquare, targetSquare);
-    },
+    (sourceSquare: Square, targetSquare: Square): boolean => onMove(sourceSquare, targetSquare),
     [onMove]
   );
 
   const handlePieceDragBegin = useCallback(
-    (_piece: Piece, square: Square) => {
-      selectSquare(square);
-    },
+    (_piece: Piece, square: Square) => { selectSquare(square); },
     [selectSquare]
   );
 
@@ -179,13 +160,9 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   }, []);
 
   const handlePromotionPieceSelect = useCallback(
-    (
-      piece?: PromotionPieceOption,
-      fromSquare?: Square,
-      toSquare?: Square
-    ): boolean => {
+    (piece?: PromotionPieceOption, fromSquare?: Square, toSquare?: Square): boolean => {
       if (!piece) return false;
-      const promotionChar = piece[1].toLowerCase(); // "wQ" → "q"
+      const promotionChar = piece[1].toLowerCase();
       const from = promotionPending?.from ?? fromSquare;
       const to = promotionPending?.to ?? toSquare;
       if (!from || !to) return false;
@@ -197,10 +174,16 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   );
 
   return (
-    <div className="rounded-lg shadow-lg p-2 bg-zinc-800 w-full max-w-[580px]">
+    <div
+      className="w-full rounded-lg overflow-hidden"
+      style={{
+        background: "var(--c-raised)",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)",
+      }}
+    >
       <Chessboard
         position={position}
-        animationDuration={200}
+        animationDuration={animationDuration}
         areArrowsAllowed={true}
         customArrows={mergedArrows}
         onArrowsChange={setUserArrows}
@@ -213,6 +196,8 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
         promotionToSquare={promotionPending?.to ?? null}
         promotionDialogVariant="modal"
         onPromotionPieceSelect={handlePromotionPieceSelect}
+        customDarkSquareStyle={{ backgroundColor: "#A0785A" }}
+        customLightSquareStyle={{ backgroundColor: "#EDE0C8" }}
       />
     </div>
   );

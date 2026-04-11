@@ -6,11 +6,9 @@ const PIECE_VALUES: Record<string, number> = {
   p: 1, n: 3, b: 3, r: 5, q: 9, k: 0,
 };
 
-// Unicode chess symbols
-const WHITE_SYMBOLS: Record<string, string> = {
-  q: "♕", r: "♖", b: "♗", n: "♘", p: "♙",
-};
-const BLACK_SYMBOLS: Record<string, string> = {
+// Unicode chess symbols — always use filled/solid variants for both colors;
+// CSS color + stroke distinguishes white vs black pieces on a dark background.
+const PIECE_SYMBOLS: Record<string, string> = {
   q: "♛", r: "♜", b: "♝", n: "♞", p: "♟",
 };
 
@@ -65,7 +63,6 @@ const CapturedPieces: React.FC<CapturedPiecesProps> = ({ fen, side }) => {
   // "top" row shows captures made by Black (white pieces taken)
   // "bottom" row shows captures made by White (black pieces taken)
   const pieces = side === "top" ? capturedByBlack : capturedByWhite;
-  const symbols = side === "top" ? WHITE_SYMBOLS : BLACK_SYMBOLS;
 
   // Material advantage sign: positive = white ahead, negative = black ahead
   const showAdvantage =
@@ -75,17 +72,29 @@ const CapturedPieces: React.FC<CapturedPiecesProps> = ({ fen, side }) => {
       ? `+${Math.abs(materialAdvantage)}`
       : null;
 
+  // White pieces: cream fill with dark shadow for definition
+  // Black pieces: near-black fill with light outline so they're visible on dark bg
+  const pieceStyle: React.CSSProperties =
+    side === "top"
+      ? { color: "#f0d9b5", textShadow: "0 0 2px #000, 0 0 4px #000" }
+      : { color: "#1a1a1a", WebkitTextStroke: "0.8px #aaa" };
+
   return (
-    <div className="flex items-center gap-1 min-h-[22px] px-1">
-      <span className="text-lg leading-none tracking-tight">
+    <div className="flex items-center gap-1.5 min-h-[20px] px-1">
+      <span className="text-base leading-none tracking-tighter">
         {pieces.map((type, i) => (
-          <span key={i} className={side === "top" ? "text-zinc-200" : "text-zinc-300"}>
-            {symbols[type]}
+          <span key={i} style={pieceStyle}>
+            {PIECE_SYMBOLS[type]}
           </span>
         ))}
       </span>
       {showAdvantage && (
-        <span className="text-xs font-bold text-zinc-400 ml-1">{showAdvantage}</span>
+        <span
+          className="text-xs font-semibold tabular-nums"
+          style={{ color: "var(--c-gold)", fontFamily: "var(--f-mono)" }}
+        >
+          {showAdvantage}
+        </span>
       )}
     </div>
   );
