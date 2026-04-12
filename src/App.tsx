@@ -56,6 +56,8 @@ function App() {
   const [activeOpening, setActiveOpening] = useState<Opening | null>(null);
   const [openingStep, setOpeningStep] = useState(-1);
   const [openingFen, setOpeningFen] = useState<string | null>(null);
+  // UCI moves for the currently active line (main or variation) — kept in sync by OpeningsPanel
+  const [openingActiveMoves, setOpeningActiveMoves] = useState<string[]>([]);
 
   // Beta access key
   useEffect(() => {
@@ -152,7 +154,23 @@ function App() {
           content: msg.text,
         }));
 
-      const moveHistory = chessRef.current.history();
+      // In opening lesson mode, derive SAN history from the opening's active moves
+      // (not from chessRef which only tracks the main game board).
+      let moveHistory: string[];
+      if (activeTab === "openings" && openingActiveMoves.length > 0) {
+        const chess = new Chess();
+        moveHistory = [];
+        const upTo = openingStep < 0 ? -1 : openingStep;
+        for (let i = 0; i <= upTo && i < openingActiveMoves.length; i++) {
+          const uci = openingActiveMoves[i];
+          try {
+            const m = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] ?? "q" });
+            if (m) moveHistory.push(m.san);
+          } catch { break; }
+        }
+      } else {
+        moveHistory = chessRef.current.history();
+      }
 
       const response = await askGM({
         selectedGM,
@@ -175,9 +193,10 @@ function App() {
   const handleQuickAsk = () => handleQuestion("What should I play here?");
 
   const handleOpeningPositionChange = useCallback(
-    (fen: string, _moveIndex: number, opening: Opening) => {
+    (fen: string, _moveIndex: number, opening: Opening, activeMoves: string[]) => {
       setOpeningFen(fen);
       setActiveOpening(opening);
+      setOpeningActiveMoves(activeMoves);
     },
     []
   );
@@ -198,6 +217,7 @@ function App() {
     setActiveOpening(null);
     setOpeningStep(-1);
     setOpeningFen(null);
+    setOpeningActiveMoves([]);
   }, []);
 
   useEffect(() => {
@@ -205,12 +225,26 @@ function App() {
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) return;
-      if (e.key === "ArrowLeft") { e.preventDefault(); handleBack(); }
-      if (e.key === "ArrowRight") { e.preventDefault(); handleForward(); }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (activeTab === "openings" && activeOpening) {
+          setOpeningStep((s) => Math.max(-1, s - 1));
+        } else {
+          handleBack();
+        }
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (activeTab === "openings" && activeOpening) {
+          setOpeningStep((s) => Math.min(openingActiveMoves.length - 1, s + 1));
+        } else {
+          handleForward();
+        }
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleBack, handleForward]);
+  }, [activeTab, activeOpening, openingActiveMoves.length, handleBack, handleForward]);
 
   const displayFen = activeTab === "openings" && openingFen ? openingFen : currentFen;
 

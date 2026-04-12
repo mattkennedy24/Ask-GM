@@ -4,7 +4,7 @@ import { OPENINGS, CATEGORIES, type Opening } from "../data/openings";
 
 interface OpeningsPanelProps {
   /** Called when the user enters an opening lesson so we can update the board */
-  onPositionChange: (fen: string, moveIndex: number, opening: Opening) => void;
+  onPositionChange: (fen: string, moveIndex: number, opening: Opening, activeMoves: string[]) => void;
   /** Called when user exits the lesson */
   onExit: () => void;
   /** Current lesson step set externally (for keyboard nav sync) */
@@ -87,14 +87,14 @@ const OpeningsPanel: React.FC<OpeningsPanelProps> = ({
       ? (activeOpening.variations[activeVariationIndex]?.name ?? "Variation")
       : "Main Line";
 
-  // When active opening or variation changes, broadcast position
+  // When active opening or variation changes, broadcast position + the active moves array
   useEffect(() => {
     if (!activeOpening) return;
     const fen =
       currentStep < 0
         ? getInitialFen()
         : getFenAtStep(activeMoves, currentStep);
-    onPositionChange(fen, currentStep, activeOpening);
+    onPositionChange(fen, currentStep, activeOpening, activeMoves);
   }, [activeOpening, activeVariationIndex, currentStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset step when switching variations
