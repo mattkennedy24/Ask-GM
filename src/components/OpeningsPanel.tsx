@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Chess } from "chess.js";
-import { OPENINGS, CATEGORIES, type Opening, type OpeningVariation } from "../data/openings";
+import { OPENINGS, CATEGORIES, type Opening } from "../data/openings";
 
 interface OpeningsPanelProps {
   /** Called when the user enters an opening lesson so we can update the board */
