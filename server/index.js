@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import Anthropic from "@anthropic-ai/sdk";
 import { Chess } from "chess.js";
 import dotenv from "dotenv";
@@ -166,7 +167,15 @@ function buildSystemPrompt(selectedGM, currentFen, moveHistory, topLines) {
  *   topLines?: Array<{ pv: string[], score: number | null, mate: number | null }>
  * }
  */
-app.post("/api/chat", async (req, res) => {
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20,             // max 20 requests per IP per minute
+  message: { error: "Too many requests. Please wait a moment before asking again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.post("/api/chat", chatLimiter, async (req, res) => {
   try {
     const { selectedGM, currentFen, question, conversationHistory, moveHistory, topLines } = req.body;
 
