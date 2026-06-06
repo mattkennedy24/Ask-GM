@@ -17,6 +17,7 @@ interface ChessBoardProps {
   kingInCheckSquare: string | null;
   engineArrow: Arrow | null;
   animationDuration?: number;
+  boardOrientation?: "white" | "black";
 }
 
 const ChessBoard: React.FC<ChessBoardProps> = ({
@@ -27,6 +28,7 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   kingInCheckSquare,
   engineArrow,
   animationDuration = 200,
+  boardOrientation = "white",
 }) => {
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [legalMoveSquares, setLegalMoveSquares] = useState<string[]>([]);
@@ -183,6 +185,7 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
     >
       <Chessboard
         position={position}
+        boardOrientation={boardOrientation}
         animationDuration={animationDuration}
         areArrowsAllowed={true}
         customArrows={mergedArrows}

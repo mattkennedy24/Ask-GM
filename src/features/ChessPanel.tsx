@@ -4,6 +4,7 @@ import ChessBoard from "../components/ChessBoard";
 import EvalBar from "../components/EvalBar";
 import CapturedPieces from "../components/CapturedPieces";
 import EngineLines from "../components/EngineLines";
+import MoveNotation from "../components/MoveNotation";
 import type { Arrow } from "react-chessboard/dist/chessboard/types";
 import type { EngineLineResult } from "../hooks/useStockfish";
 
@@ -24,6 +25,9 @@ interface ChessPanelProps {
   mateIn: number | null;
   engineThinking: boolean;
   topLines: EngineLineResult[];
+  sanMoves: string[];
+  historyIndex: number;
+  onNavigate: (index: number) => void;
 }
 
 const ChessPanel: React.FC<ChessPanelProps> = ({
@@ -43,7 +47,11 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
   mateIn,
   engineThinking,
   topLines,
+  sanMoves,
+  historyIndex,
+  onNavigate,
 }) => {
+  const [boardFlipped, setBoardFlipped] = useState(false);
   // Which engine line is selected for preview (-1 = none)
   const [selectedLine, setSelectedLine] = useState(-1);
   // Which move within the selected line we're previewing (-1 = not yet stepping)
@@ -134,6 +142,7 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
             kingInCheckSquare={kingInCheckSquare}
             engineArrow={isPreviewing ? null : engineArrow}
             animationDuration={isPreviewing ? 0 : 200}
+            boardOrientation={boardFlipped ? "black" : "white"}
           />
 
           <CapturedPieces fen={position} side="bottom" />
@@ -144,6 +153,20 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
       <div className="md:hidden mt-2 px-1">
         <EvalBar evalScore={evalScore} mateIn={mateIn} thinking={engineThinking} />
       </div>
+
+      {/* ── Move notation ── */}
+      {sanMoves.length > 0 && (
+        <div
+          className="mt-3 pt-3 px-1"
+          style={{ borderTop: "1px solid var(--c-border)" }}
+        >
+          <MoveNotation
+            sanMoves={sanMoves}
+            currentIndex={historyIndex}
+            onNavigate={onNavigate}
+          />
+        </div>
+      )}
 
       {/* ── Engine lines ── */}
       <div className="mt-3">
@@ -165,14 +188,17 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
         style={{ borderTop: "1px solid var(--c-border)" }}
       >
         <button onClick={onBack} className="btn text-sm">← Back</button>
-        <button
-          onClick={onForward}
-          disabled={disableForward}
-          className="btn text-sm"
-        >
+        <button onClick={onForward} disabled={disableForward} className="btn text-sm">
           Forward →
         </button>
         <button onClick={onUndo} className="btn text-sm">Undo</button>
+        <button
+          onClick={() => setBoardFlipped((f) => !f)}
+          className="btn text-sm"
+          title="Flip board"
+        >
+          ⇅
+        </button>
         <button
           onClick={onAsk}
           className="btn text-sm ml-auto"
