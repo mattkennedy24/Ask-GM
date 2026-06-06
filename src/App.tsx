@@ -5,6 +5,7 @@ import PersonalitySelector from "./components/PersonalitySelector";
 import ChatWindow from "./components/ChatWindow";
 import ChessPanel from "./features/ChessPanel";
 import OpeningsPanel from "./components/OpeningsPanel";
+import BetaKeyModal from "./components/BetaKeyModal";
 import { useStockfish } from "./hooks/useStockfish";
 import type { EngineLineResult } from "./hooks/useStockfish";
 import type { Opening } from "./data/openings";
@@ -50,6 +51,8 @@ function App() {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [currentFen, setCurrentFen] = useState(chessRef.current.fen());
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
+  // SAN move list parallel to history: sanMoves[i] is the move from history[i] → history[i+1]
+  const [sanMoves, setSanMoves] = useState<string[]>([]);
 
   // Opening lesson state
   const [openingsPanelOpen, setOpeningsPanelOpen] = useState(true);
@@ -59,12 +62,12 @@ function App() {
   // UCI moves for the currently active line (main or variation) — kept in sync by OpeningsPanel
   const [openingActiveMoves, setOpeningActiveMoves] = useState<string[]>([]);
 
-  // Beta access key
-  useEffect(() => {
-    if (!localStorage.getItem("betaKey")) {
-      const key = window.prompt("Enter beta access code:");
-      if (key) localStorage.setItem("betaKey", key);
-    }
+  // Beta access key — show modal if not yet stored
+  const [showBetaModal, setShowBetaModal] = useState(() => !localStorage.getItem("betaKey"));
+
+  const handleBetaKeySubmit = useCallback((key: string) => {
+    localStorage.setItem("betaKey", key);
+    setShowBetaModal(false);
   }, []);
 
   const {
@@ -117,7 +120,10 @@ function App() {
     setLastMove({ from, to });
     const fen = chessRef.current.fen();
     const nextHistory = history.slice(0, historyIndex + 1).concat(fen);
+    // Truncate san branch at current index then append new move
+    const nextSanMoves = sanMoves.slice(0, historyIndex).concat(move.san);
     setHistory(nextHistory);
+    setSanMoves(nextSanMoves);
     setHistoryIndex(nextHistory.length - 1);
     setCurrentFen(fen);
     return true;
@@ -132,6 +138,8 @@ function App() {
   }, [history.length, historyIndex, loadFenAt]);
 
   const handleUndo = useCallback(() => handleBack(), [handleBack]);
+
+  const handleNavigate = useCallback((index: number) => loadFenAt(index), [loadFenAt]);
 
   const handleQuestion = async (question: string) => {
     setThinking(true);
@@ -253,6 +261,9 @@ function App() {
       className="min-h-screen md:h-screen flex flex-col overflow-x-hidden md:overflow-hidden"
       style={{ background: "var(--c-bg)", color: "var(--c-text)", fontFamily: "var(--f-sans)" }}
     >
+      {/* ════ Beta key modal ════ */}
+      {showBetaModal && <BetaKeyModal onSubmit={handleBetaKeySubmit} />}
+
       {/* ════ Header ════ */}
       <header
         className="shrink-0"
@@ -364,6 +375,9 @@ function App() {
               mateIn={mateIn}
               engineThinking={stockfishThinking}
               topLines={topLines}
+              sanMoves={sanMoves}
+              historyIndex={historyIndex}
+              onNavigate={handleNavigate}
             />
           </div>
         </div>
