@@ -9,6 +9,8 @@ import BetaKeyModal from "./components/BetaKeyModal";
 import { useStockfish } from "./hooks/useStockfish";
 import type { EngineLineResult } from "./hooks/useStockfish";
 import type { Opening } from "./data/openings";
+import { detectOpening } from "./utils/openingDetection";
+import type { DetectedOpening } from "./utils/openingDetection";
 
 type ChatMessage = { sender: string; text: string };
 type AppTab = "game" | "openings";
@@ -20,6 +22,7 @@ async function askGM(payload: {
   conversationHistory: { role: string; content: string }[];
   moveHistory?: string[];
   topLines?: EngineLineResult[];
+  openingName?: string;
 }): Promise<string> {
   const res = await fetch("/api/chat", {
     method: "POST",
@@ -51,15 +54,18 @@ function App() {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [currentFen, setCurrentFen] = useState(chessRef.current.fen());
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
-  // SAN move list parallel to history: sanMoves[i] is the move from history[i] → history[i+1]
+  // SAN moves parallel to history: sanMoves[i] is the move from history[i] → history[i+1]
   const [sanMoves, setSanMoves] = useState<string[]>([]);
+  // UCI moves parallel to sanMoves (same indexing)
+  const [uciMoves, setUciMoves] = useState<string[]>([]);
+  // Detected opening from the current game's move sequence
+  const [detectedOpening, setDetectedOpening] = useState<DetectedOpening | null>(null);
 
   // Opening lesson state
   const [openingsPanelOpen, setOpeningsPanelOpen] = useState(true);
   const [activeOpening, setActiveOpening] = useState<Opening | null>(null);
   const [openingStep, setOpeningStep] = useState(-1);
   const [openingFen, setOpeningFen] = useState<string | null>(null);
-  // UCI moves for the currently active line (main or variation) — kept in sync by OpeningsPanel
   const [openingActiveMoves, setOpeningActiveMoves] = useState<string[]>([]);
 
   // Beta access key — show modal if not yet stored
@@ -84,6 +90,13 @@ function App() {
   useEffect(() => {
     analyzePosition(fenToAnalyse);
   }, [fenToAnalyse, analyzePosition]);
+
+  // Update detected opening whenever game UCI moves change
+  useEffect(() => {
+    if (activeTab === "game") {
+      setDetectedOpening(detectOpening(uciMoves.slice(0, historyIndex)));
+    }
+  }, [uciMoves, historyIndex, activeTab]);
 
   const derivedChess = useMemo(() => new Chess(currentFen), [currentFen]);
   const inCheck = derivedChess.inCheck();
@@ -120,10 +133,13 @@ function App() {
     setLastMove({ from, to });
     const fen = chessRef.current.fen();
     const nextHistory = history.slice(0, historyIndex + 1).concat(fen);
-    // Truncate san branch at current index then append new move
+    // Truncate at current index then append new move (handles branching)
     const nextSanMoves = sanMoves.slice(0, historyIndex).concat(move.san);
+    const uciMove = `${from}${to}${promotion ?? ""}`;
+    const nextUciMoves = uciMoves.slice(0, historyIndex).concat(uciMove);
     setHistory(nextHistory);
     setSanMoves(nextSanMoves);
+    setUciMoves(nextUciMoves);
     setHistoryIndex(nextHistory.length - 1);
     setCurrentFen(fen);
     return true;
@@ -153,6 +169,14 @@ function App() {
         : "";
     const enrichedQuestion = openingContext ? openingContext + question : question;
 
+    // Determine the opening name to send to the server
+    const openingNameForServer =
+      activeOpening && activeTab === "openings"
+        ? `${activeOpening.name} (ECO ${activeOpening.eco})`
+        : detectedOpening
+        ? `${detectedOpening.name} (ECO ${detectedOpening.eco})`
+        : undefined;
+
     try {
       const conversationHistory = chatMessages
         .filter((_, i) => i > 0)
@@ -162,8 +186,9 @@ function App() {
           content: msg.text,
         }));
 
-      // In opening lesson mode, derive SAN history from the opening's active moves
-      // (not from chessRef which only tracks the main game board).
+      // Use sanMoves from state (up to current historyIndex) rather than
+      // chessRef.current.history() — that only works after sequential moves,
+      // not after navigating back/forward via loadFenAt.
       let moveHistory: string[];
       if (activeTab === "openings" && openingActiveMoves.length > 0) {
         const chess = new Chess();
@@ -177,7 +202,8 @@ function App() {
           } catch { break; }
         }
       } else {
-        moveHistory = chessRef.current.history();
+        // Use sanMoves[0..historyIndex-1] — accurate regardless of navigation state
+        moveHistory = sanMoves.slice(0, historyIndex);
       }
 
       const response = await askGM({
@@ -187,6 +213,7 @@ function App() {
         conversationHistory,
         moveHistory,
         topLines,
+        openingName: openingNameForServer,
       });
 
       setChatMessages((msgs) => [...msgs, { sender: "GM", text: response }]);
@@ -256,6 +283,12 @@ function App() {
 
   const displayFen = activeTab === "openings" && openingFen ? openingFen : currentFen;
 
+  const gmColor: Record<string, string> = {
+    Magnus: "var(--c-gm-magnus)",
+    Hikaru: "var(--c-gm-hikaru)",
+    Bobby: "var(--c-gm-bobby)",
+  };
+
   return (
     <div
       className="min-h-screen md:h-screen flex flex-col overflow-x-hidden md:overflow-hidden"
@@ -269,20 +302,53 @@ function App() {
         className="shrink-0"
         style={{ background: "var(--c-surface)", borderBottom: "1px solid var(--c-border)" }}
       >
-        {/* ── Main row: Logo + Tabs (+ GM pills on desktop) ── */}
-        <div className="flex items-center justify-between px-4 py-2.5">
+        {/* ── Main row ── */}
+        <div className="flex items-center justify-between px-4 py-2.5 gap-3">
           {/* Brand */}
-          <h1
-            className="text-xl tracking-tight select-none"
-            style={{
-              fontFamily: "var(--f-serif)",
-              fontWeight: 600,
-              color: "var(--c-gold-bright)",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            Ask <em style={{ fontStyle: "italic", color: "var(--c-text)" }}>GM</em>
-          </h1>
+          <div className="flex items-center gap-2 shrink-0">
+            <h1
+              className="text-xl tracking-tight select-none"
+              style={{
+                fontFamily: "var(--f-serif)",
+                fontWeight: 600,
+                color: "var(--c-gold-bright)",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              Ask <em style={{ fontStyle: "italic", color: "var(--c-text)" }}>GM</em>
+            </h1>
+            {/* Opening badge — desktop only */}
+            {activeTab === "game" && detectedOpening && (
+              <span
+                className="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs badge-in"
+                style={{
+                  background: "var(--c-gold-dim)",
+                  border: "1px solid rgba(200,144,64,0.25)",
+                  color: "var(--c-gold)",
+                  fontFamily: "var(--f-mono)",
+                  fontSize: "11px",
+                  maxWidth: "220px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                title={`${detectedOpening.name} (${detectedOpening.eco})`}
+              >
+                <span style={{ opacity: 0.6 }}>{detectedOpening.eco}</span>
+                <span
+                  style={{
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    maxWidth: "160px",
+                    display: "inline-block",
+                  }}
+                >
+                  {detectedOpening.name.split(" — ")[0]}
+                </span>
+              </span>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
             {/* Tab switcher */}
@@ -296,12 +362,13 @@ function App() {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className="px-3 py-1.5 rounded-md font-medium transition-all duration-150 text-xs md:text-sm"
+                    className="px-3 py-1.5 rounded-md font-medium text-xs md:text-sm"
                     style={{
                       background: isActive ? "var(--c-hover)" : "transparent",
                       border: `1px solid ${isActive ? "var(--c-border-bright)" : "transparent"}`,
                       color: isActive ? "var(--c-text)" : "var(--c-text-muted)",
                       fontFamily: "var(--f-sans)",
+                      transition: "background 150ms ease, border-color 150ms ease, color 150ms ease",
                     }}
                   >
                     {tab === "game" ? "♟ Game" : "📖 Openings"}
@@ -310,7 +377,7 @@ function App() {
               })}
             </div>
 
-            {/* GM pills — desktop only (mobile has its own row below) */}
+            {/* GM pills — desktop only */}
             <div className="hidden md:flex">
               <PersonalitySelector selected={selectedGM} onSelect={setSelectedGM} />
             </div>
@@ -318,28 +385,29 @@ function App() {
         </div>
 
         {/* ── Mobile GM selector row ── */}
-        <div
-          className="md:hidden grid grid-cols-3 gap-2 px-3 pb-3"
-        >
+        <div className="md:hidden grid grid-cols-3 gap-2 px-3 pb-3">
           {(["Magnus", "Hikaru", "Bobby"] as const).map((name) => {
-            const color =
-              name === "Magnus" ? "var(--c-gm-magnus)"
-              : name === "Hikaru" ? "var(--c-gm-hikaru)"
-              : "var(--c-gm-bobby)";
+            const color = gmColor[name] ?? "var(--c-gold)";
             const isActive = selectedGM === name;
+            const fullNames: Record<string, string> = {
+              Magnus: "Magnus C.",
+              Hikaru: "Hikaru N.",
+              Bobby: "Bobby F.",
+            };
             return (
               <button
                 key={name}
                 onClick={() => setSelectedGM(name)}
-                className="py-2 rounded-lg text-sm font-medium transition-all duration-150 text-center relative"
+                className="py-2 rounded-lg text-sm font-medium text-center relative"
                 style={{
                   background: isActive ? `${color}18` : "var(--c-raised)",
                   border: `1px solid ${isActive ? color : "var(--c-border-mid)"}`,
                   color: isActive ? color : "var(--c-text-muted)",
                   fontFamily: "var(--f-sans)",
+                  transition: "background 150ms ease, border-color 150ms ease, color 150ms ease",
                 }}
               >
-                {name}
+                {fullNames[name]}
                 {isActive && (
                   <span
                     className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
@@ -350,12 +418,30 @@ function App() {
             );
           })}
         </div>
+
+        {/* ── Mobile opening badge ── */}
+        {activeTab === "game" && detectedOpening && (
+          <div className="md:hidden px-3 pb-2.5">
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs badge-in"
+              style={{
+                background: "var(--c-gold-dim)",
+                border: "1px solid rgba(200,144,64,0.25)",
+                color: "var(--c-gold)",
+                fontFamily: "var(--f-mono)",
+              }}
+            >
+              <span style={{ opacity: 0.6 }}>{detectedOpening.eco}</span>
+              {detectedOpening.name.split(" — ")[0]}
+            </span>
+          </div>
+        )}
       </header>
 
       {/* ════ Main content ════ */}
       <main className="flex-1 flex flex-col md:flex-row gap-3 p-3 overflow-y-auto md:overflow-hidden md:min-h-0">
 
-        {/* ── Left: Chess board panel — shrinks to board width, doesn't stretch ── */}
+        {/* ── Left: Chess board panel ── */}
         <div className="flex flex-col md:overflow-y-auto md:shrink-0 min-w-0">
           <div className="w-full max-w-[600px]">
             <ChessPanel
@@ -382,7 +468,7 @@ function App() {
           </div>
         </div>
 
-        {/* ── Right: Openings panel + Chat — grows to fill remaining space ── */}
+        {/* ── Right: Openings panel + Chat ── */}
         <div
           className={`flex gap-3 md:flex-1 md:min-w-0 ${
             activeTab === "openings"
@@ -395,7 +481,6 @@ function App() {
             <div
               className={`panel overflow-hidden flex flex-col md:flex-[3] md:min-w-0 md:h-full md:min-h-0 ${openingsPanelOpen ? "min-h-[300px]" : ""}`}
             >
-              {/* Mobile accordion toggle */}
               <button
                 className="md:hidden flex items-center justify-between px-4 py-3 w-full text-left"
                 style={{ borderBottom: "1px solid var(--c-border)" }}
@@ -434,6 +519,7 @@ function App() {
               onSubmit={handleQuestion}
               thinking={thinking}
               selectedGM={selectedGM}
+              detectedOpening={detectedOpening}
             />
           </div>
         </div>
