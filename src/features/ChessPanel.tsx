@@ -30,6 +30,12 @@ interface ChessPanelProps {
   onNavigate: (index: number) => void;
 }
 
+const GM_COLORS: Record<string, string> = {
+  Magnus: "var(--c-gm-magnus)",
+  Hikaru: "var(--c-gm-hikaru)",
+  Bobby:  "var(--c-gm-bobby)",
+};
+
 const ChessPanel: React.FC<ChessPanelProps> = ({
   position,
   onMove,
@@ -52,9 +58,7 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
   onNavigate,
 }) => {
   const [boardFlipped, setBoardFlipped] = useState(false);
-  // Which engine line is selected for preview (-1 = none)
   const [selectedLine, setSelectedLine] = useState(-1);
-  // Which move within the selected line we're previewing (-1 = not yet stepping)
   const [pvStep, setPvStep] = useState(-1);
 
   const isPreviewing = selectedLine >= 0 && pvStep >= 0;
@@ -64,7 +68,6 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
     [topLines, selectedLine]
   );
 
-  // Board FEN while stepping through a line
   const previewFen = useMemo(() => {
     if (!isPreviewing || activePv.length === 0) return null;
     const chess = new Chess(position);
@@ -86,21 +89,17 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
 
   const handleSelectLine = useCallback((i: number) => {
     if (i === selectedLine) {
-      // Toggle off
       setSelectedLine(-1);
       setPvStep(-1);
     } else {
       setSelectedLine(i);
-      setPvStep(0); // Auto-preview first move
+      setPvStep(0);
     }
   }, [selectedLine]);
 
   const handlePvStep = useCallback((dir: 1 | -1) => {
     setPvStep((s) => {
-      if (dir === -1) {
-        const next = s - 1;
-        return next < 0 ? 0 : next;
-      }
+      if (dir === -1) return s <= 0 ? 0 : s - 1;
       const next = s + 1;
       return next >= activePv.length ? s : next;
     });
@@ -111,16 +110,12 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
     setPvStep(-1);
   }, []);
 
-  const gmColor: Record<string, string> = {
-    Magnus: "var(--c-gm-magnus)",
-    Hikaru: "var(--c-gm-hikaru)",
-    Bobby:  "var(--c-gm-bobby)",
-  };
+  const gmColor = GM_COLORS[selectedGM] ?? "var(--c-gold)";
 
   return (
     <div
-      className="panel p-3 shadow-2xl w-full"
-      style={{ boxShadow: "0 16px 48px rgba(0,0,0,0.7)" }}
+      className="panel p-3 w-full"
+      style={{ boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}
     >
       {/* ── Board + eval bar row ── */}
       <div className="flex gap-2 items-stretch">
@@ -132,7 +127,6 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
         {/* Board column */}
         <div className="flex-1 flex flex-col min-w-0 gap-1">
           <CapturedPieces fen={position} side="top" />
-
           <ChessBoard
             key={isPreviewing ? `pv-${selectedLine}-${pvStep}` : "game"}
             position={isPreviewing && previewFen ? previewFen : position}
@@ -144,7 +138,6 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
             animationDuration={isPreviewing ? 0 : 200}
             boardOrientation={boardFlipped ? "black" : "white"}
           />
-
           <CapturedPieces fen={position} side="bottom" />
         </div>
       </div>
@@ -184,31 +177,54 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
 
       {/* ── Control buttons ── */}
       <div
-        className="flex flex-wrap gap-2 mt-3 pt-3"
+        className="flex flex-wrap items-center gap-1.5 mt-3 pt-3"
         style={{ borderTop: "1px solid var(--c-border)" }}
       >
-        <button onClick={onBack} className="btn text-sm">← Back</button>
-        <button onClick={onForward} disabled={disableForward} className="btn text-sm">
-          Forward →
+        {/* Navigation group */}
+        <div className="flex gap-1">
+          <button onClick={onBack} className="btn text-xs px-2.5 py-1.5" title="Go back one move (←)">
+            ←
+          </button>
+          <button
+            onClick={onForward}
+            disabled={disableForward}
+            className="btn text-xs px-2.5 py-1.5"
+            title="Go forward one move (→)"
+          >
+            →
+          </button>
+        </div>
+
+        <button onClick={onUndo} className="btn text-xs px-2.5 py-1.5">
+          Undo
         </button>
-        <button onClick={onUndo} className="btn text-sm">Undo</button>
         <button
           onClick={() => setBoardFlipped((f) => !f)}
-          className="btn text-sm"
+          className="btn text-xs px-2.5 py-1.5"
           title="Flip board"
         >
-          ⇅
+          ⇅ Flip
         </button>
+
+        {/* Ask GM button — right-aligned, GM-colored */}
         <button
           onClick={onAsk}
-          className="btn text-sm ml-auto"
+          className="btn text-xs ml-auto px-3 py-1.5 font-semibold"
           style={{
-            background: `${gmColor[selectedGM] ?? "var(--c-gold)"}18`,
-            borderColor: `${gmColor[selectedGM] ?? "var(--c-gold)"}66`,
-            color: gmColor[selectedGM] ?? "var(--c-gold)",
+            background: `${gmColor}18`,
+            borderColor: `${gmColor}66`,
+            color: gmColor,
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = `${gmColor}28`;
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 8px ${gmColor}25`;
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = `${gmColor}18`;
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
           }}
         >
-          Ask {selectedGM}
+          Ask {selectedGM} →
         </button>
       </div>
     </div>

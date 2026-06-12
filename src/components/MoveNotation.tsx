@@ -1,9 +1,7 @@
 import React, { useEffect, useRef } from "react";
 
 interface MoveNotationProps {
-  /** SAN moves from game start. sanMoves[i] transitions history[i] → history[i+1]. */
   sanMoves: string[];
-  /** Current history index (0 = start position, 1 = after move 1, etc.) */
   currentIndex: number;
   onNavigate: (index: number) => void;
 }
@@ -30,7 +28,6 @@ const MoveNotation: React.FC<MoveNotationProps> = ({ sanMoves, currentIndex, onN
   const containerRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
 
-  // Auto-scroll active move into view
   useEffect(() => {
     if (activeRef.current && containerRef.current) {
       activeRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -40,7 +37,7 @@ const MoveNotation: React.FC<MoveNotationProps> = ({ sanMoves, currentIndex, onN
   if (sanMoves.length === 0) {
     return (
       <div
-        className="flex items-center justify-center py-3 text-xs"
+        className="flex items-center justify-center py-2 text-xs"
         style={{ color: "var(--c-text-muted)", fontFamily: "var(--f-mono)" }}
       >
         No moves yet
@@ -53,7 +50,7 @@ const MoveNotation: React.FC<MoveNotationProps> = ({ sanMoves, currentIndex, onN
   return (
     <div
       ref={containerRef}
-      className="flex flex-wrap gap-x-1 gap-y-0.5 overflow-y-auto"
+      className="flex flex-wrap gap-x-0.5 gap-y-0.5 overflow-y-auto"
       style={{ maxHeight: "5rem", scrollbarWidth: "none" }}
     >
       {/* Start position button */}
@@ -62,8 +59,17 @@ const MoveNotation: React.FC<MoveNotationProps> = ({ sanMoves, currentIndex, onN
         className="text-xs px-1.5 py-0.5 rounded transition-all duration-100"
         style={
           currentIndex === 0
-            ? { background: "var(--c-gold-dim)", color: "var(--c-gold-bright)", border: "1px solid var(--c-gold)" }
-            : { color: "var(--c-text-muted)", border: "1px solid transparent" }
+            ? {
+                background: "var(--c-gold-dim)",
+                color: "var(--c-gold-bright)",
+                border: "1px solid var(--c-gold)",
+                fontFamily: "var(--f-mono)",
+              }
+            : {
+                color: "var(--c-text-muted)",
+                border: "1px solid transparent",
+                fontFamily: "var(--f-mono)",
+              }
         }
       >
         ⊙
@@ -73,7 +79,7 @@ const MoveNotation: React.FC<MoveNotationProps> = ({ sanMoves, currentIndex, onN
         <React.Fragment key={pair.number}>
           {/* Move number */}
           <span
-            className="text-xs self-center tabular-nums select-none"
+            className="text-xs self-center tabular-nums select-none px-0.5"
             style={{ color: "var(--c-text-muted)", fontFamily: "var(--f-mono)" }}
           >
             {pair.number}.
@@ -81,38 +87,70 @@ const MoveNotation: React.FC<MoveNotationProps> = ({ sanMoves, currentIndex, onN
 
           {/* White move */}
           {pair.white && (
-            <button
-              ref={currentIndex === pair.white.index ? activeRef : undefined}
-              onClick={() => onNavigate(pair.white!.index)}
-              className="text-xs px-1.5 py-0.5 rounded transition-all duration-100"
-              style={
-                currentIndex === pair.white.index
-                  ? { background: "var(--c-gold-dim)", color: "var(--c-gold-bright)", border: "1px solid var(--c-gold)", fontFamily: "var(--f-mono)" }
-                  : { color: "var(--c-text-soft)", border: "1px solid transparent", fontFamily: "var(--f-mono)" }
-              }
-            >
-              {pair.white.san}
-            </button>
+            <MoveButton
+              san={pair.white.san}
+              index={pair.white.index}
+              currentIndex={currentIndex}
+              onNavigate={onNavigate}
+              activeRef={currentIndex === pair.white.index ? activeRef : undefined}
+            />
           )}
 
           {/* Black move */}
           {pair.black && (
-            <button
-              ref={currentIndex === pair.black.index ? activeRef : undefined}
-              onClick={() => onNavigate(pair.black!.index)}
-              className="text-xs px-1.5 py-0.5 rounded transition-all duration-100"
-              style={
-                currentIndex === pair.black.index
-                  ? { background: "var(--c-gold-dim)", color: "var(--c-gold-bright)", border: "1px solid var(--c-gold)", fontFamily: "var(--f-mono)" }
-                  : { color: "var(--c-text-soft)", border: "1px solid transparent", fontFamily: "var(--f-mono)" }
-              }
-            >
-              {pair.black.san}
-            </button>
+            <MoveButton
+              san={pair.black.san}
+              index={pair.black.index}
+              currentIndex={currentIndex}
+              onNavigate={onNavigate}
+              activeRef={currentIndex === pair.black.index ? activeRef : undefined}
+            />
           )}
         </React.Fragment>
       ))}
     </div>
+  );
+};
+
+interface MoveButtonProps {
+  san: string;
+  index: number;
+  currentIndex: number;
+  onNavigate: (index: number) => void;
+  activeRef?: React.RefObject<HTMLButtonElement | null>;
+}
+
+const MoveButton: React.FC<MoveButtonProps> = ({ san, index, currentIndex, onNavigate, activeRef }) => {
+  const isActive = currentIndex === index;
+
+  return (
+    <button
+      ref={activeRef}
+      onClick={() => onNavigate(index)}
+      className="text-xs px-1.5 py-0.5 rounded"
+      style={{
+        background: isActive ? "var(--c-gold-dim)" : "transparent",
+        color: isActive ? "var(--c-gold-bright)" : "var(--c-text-soft)",
+        border: `1px solid ${isActive ? "var(--c-gold)" : "transparent"}`,
+        fontFamily: "var(--f-mono)",
+        transition: "background 100ms ease, color 100ms ease, border-color 100ms ease",
+        fontWeight: isActive ? 600 : 400,
+      }}
+      onMouseEnter={(e) => {
+        if (!isActive) {
+          (e.currentTarget as HTMLButtonElement).style.background = "var(--c-hover)";
+          (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) {
+          (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+          (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text-soft)";
+        }
+      }}
+    >
+      {san}
+    </button>
   );
 };
 

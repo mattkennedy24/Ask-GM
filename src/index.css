@@ -1,22 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;600&display=swap');
 @import "tailwindcss";
 
 :root {
   /* ── Backgrounds ── */
-  --c-bg:       #09090F;   /* deepest — page base */
-  --c-surface:  #0F0F18;   /* card surfaces */
-  --c-raised:   #161622;   /* inputs, elevated elements */
-  --c-hover:    #1E1E2C;   /* hover state */
+  --c-bg:       #08080E;
+  --c-surface:  #0E0E17;
+  --c-raised:   #151521;
+  --c-hover:    #1C1C2A;
 
   /* ── Borders ── */
-  --c-border:       #1C1C2C;
-  --c-border-mid:   #262638;
-  --c-border-bright:#323248;
+  --c-border:        #1A1A2A;
+  --c-border-mid:    #242438;
+  --c-border-bright: #303048;
 
   /* ── Gold accent — brass lamp in a mahogany study ── */
   --c-gold:       #C89040;
   --c-gold-bright:#E4A84C;
   --c-gold-dim:   rgba(200, 144, 64, 0.14);
   --c-gold-glow:  rgba(200, 144, 64, 0.08);
+  --c-gold-ring:  rgba(200, 144, 64, 0.35);
 
   /* ── Interactive blue ── */
   --c-blue:     #4674E8;
@@ -25,15 +27,15 @@
   /* ── Engine line colors — tactical beams ── */
   --c-line1:        #38C87A;
   --c-line1-bg:     rgba(56, 200, 122, 0.07);
-  --c-line1-border: rgba(56, 200, 122, 0.20);
+  --c-line1-border: rgba(56, 200, 122, 0.22);
 
   --c-line2:        #E89C20;
   --c-line2-bg:     rgba(232, 156, 32, 0.06);
-  --c-line2-border: rgba(232, 156, 32, 0.18);
+  --c-line2-border: rgba(232, 156, 32, 0.20);
 
   --c-line3:        #6880A4;
   --c-line3-bg:     rgba(104, 128, 164, 0.05);
-  --c-line3-border: rgba(104, 128, 164, 0.15);
+  --c-line3-border: rgba(104, 128, 164, 0.16);
 
   /* ── GM identity colors ── */
   --c-gm-magnus: #4674E8;
@@ -49,6 +51,11 @@
   --f-serif: 'Cormorant Garamond', Georgia, serif;
   --f-mono:  'JetBrains Mono', 'Fira Code', monospace;
   --f-sans:  'DM Sans', system-ui, sans-serif;
+
+  /* ── Transitions ── */
+  --t-fast:   100ms ease;
+  --t-base:   150ms ease;
+  --t-slow:   250ms ease;
 }
 
 *, *::before, *::after {
@@ -66,59 +73,128 @@ body {
   font-family: var(--f-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Text selection ── */
+::selection {
+  background: var(--c-gold-dim);
+  color: var(--c-gold-bright);
 }
 
 /* ── Refined scrollbars ── */
-::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--c-border-bright); border-radius: 2px; }
+::-webkit-scrollbar-thumb {
+  background: var(--c-border-bright);
+  border-radius: 4px;
+  transition: background var(--t-base);
+}
 ::-webkit-scrollbar-thumb:hover { background: var(--c-gold); }
+
+/* ── Focus ring reset ── */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--c-gold-ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 
 /* ── Base component classes ── */
 @layer components {
   .btn {
-    @apply rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap;
+    @apply rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap;
     background: var(--c-raised);
     border: 1px solid var(--c-border-bright);
-    color: var(--c-text);
+    color: var(--c-text-soft);
     font-family: var(--f-sans);
     letter-spacing: 0.01em;
+    transition: background var(--t-base), border-color var(--t-base), color var(--t-base), box-shadow var(--t-base), transform var(--t-fast);
+    cursor: pointer;
   }
   .btn:hover:not(:disabled) {
     background: var(--c-hover);
     border-color: var(--c-gold);
     color: var(--c-gold-bright);
+    box-shadow: 0 0 0 1px var(--c-gold-glow);
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
   }
   .btn:focus-visible {
-    outline: 1px solid var(--c-gold);
+    outline: 2px solid var(--c-gold-ring);
     outline-offset: 2px;
   }
+
   .btn-primary {
-    @apply rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap;
+    @apply rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap;
     background: var(--c-gold-dim);
     border: 1px solid var(--c-gold);
     color: var(--c-gold-bright);
     font-family: var(--f-sans);
     letter-spacing: 0.01em;
+    transition: background var(--t-base), box-shadow var(--t-base), transform var(--t-fast);
+    cursor: pointer;
   }
   .btn-primary:hover:not(:disabled) {
     background: rgba(200, 144, 64, 0.22);
+    box-shadow: 0 0 12px var(--c-gold-glow);
+  }
+  .btn-primary:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .btn-primary:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
   }
 
   .panel {
     background: var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: 0.875rem;
+    transition: border-color var(--t-slow);
+  }
+  .panel:focus-within {
+    border-color: var(--c-border-mid);
   }
 }
 
 /* ── Thinking animation ── */
 @keyframes thinking-pulse {
-  0%, 100% { opacity: 0.3; transform: scaleY(0.6); }
-  50%       { opacity: 1;   transform: scaleY(1.0); }
+  0%, 100% { opacity: 0.25; transform: scaleY(0.55); }
+  50%       { opacity: 1.0;  transform: scaleY(1.0); }
 }
 .thinking-bar {
-  animation: thinking-pulse 1.2s ease-in-out infinite;
+  animation: thinking-pulse 1.1s ease-in-out infinite;
+  transform-origin: center bottom;
 }
-.thinking-bar:nth-child(2) { animation-delay: 0.15s; }
-.thinking-bar:nth-child(3) { animation-delay: 0.30s; }
+.thinking-bar:nth-child(2) { animation-delay: 0.18s; }
+.thinking-bar:nth-child(3) { animation-delay: 0.36s; }
+
+/* ── Fade-in for new chat messages ── */
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.msg-in {
+  animation: msg-in 0.2s ease forwards;
+}
+
+/* ── Opening badge pulse ── */
+@keyframes badge-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.badge-in {
+  animation: badge-in 0.25s ease forwards;
+}
+
+/* ── Smooth eval bar transition ── */
+.eval-fill {
+  transition: height 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+              width  0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}

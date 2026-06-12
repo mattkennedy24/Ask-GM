@@ -46,7 +46,6 @@ const anthropic = new Anthropic({
 
 /**
  * Format a centipawn score as a human-readable eval string.
- * e.g. 35 → "+0.35", -120 → "-1.20", mate 3 → "#3", mate -2 → "#-2"
  */
 function formatEval(score, mate) {
   if (mate !== null && mate !== undefined) {
@@ -63,7 +62,7 @@ function formatEval(score, mate) {
  * Convert a UCI PV array to SAN notation with move numbers.
  * e.g. ["e2e4", "e7e5", "g1f3"] from starting pos → "1. e4 e5 2. Nf3"
  */
-function formatPvLine(fen, pvMoves, maxMoves = 6) {
+function formatPvLine(fen, pvMoves, maxMoves = 7) {
   const chess = new Chess(fen);
   const startMoveNum = chess.moveNumber();
   const startsWhite = chess.turn() === "w";
@@ -82,7 +81,7 @@ function formatPvLine(fen, pvMoves, maxMoves = 6) {
       const moveNum = startMoveNum + Math.floor((i + (startsWhite ? 0 : 1)) / 2);
 
       if (isWhite) parts.push(`${moveNum}.`);
-      else if (i === 0) parts.push(`${moveNum}...`); // black to move first
+      else if (i === 0) parts.push(`${moveNum}...`);
       parts.push(result.san);
     } catch {
       // Stop on any illegal move
@@ -93,83 +92,191 @@ function formatPvLine(fen, pvMoves, maxMoves = 6) {
 }
 
 /**
- * Build the system prompt combining GM personality with structured chess context.
- *
- * Architecture: Stockfish provides all candidate moves. Claude's role is to explain
- * and coach — never to invent moves from scratch.
+ * Compute a human-readable material balance string from a FEN.
+ * Returns something like "White is up a knight (+3)" or "Material is equal".
  */
-function buildSystemPrompt(selectedGM, currentFen, moveHistory, topLines) {
+function getMaterialBalance(fen) {
+  const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+  try {
+    const chess = new Chess(fen);
+    let whiteTotal = 0;
+    let blackTotal = 0;
+
+    for (const row of chess.board()) {
+      for (const piece of row) {
+        if (!piece || piece.type === "k") continue;
+        const val = PIECE_VALUES[piece.type] ?? 0;
+        if (piece.color === "w") whiteTotal += val;
+        else blackTotal += val;
+      }
+    }
+
+    const diff = whiteTotal - blackTotal;
+    if (diff === 0) return "Material is equal.";
+    const side = diff > 0 ? "White" : "Black";
+    const abs = Math.abs(diff);
+    if (abs >= 9) return `${side} is up a queen (+${abs} points).`;
+    if (abs >= 5) return `${side} is up a rook (+${abs} points).`;
+    if (abs >= 3) return `${side} is up a minor piece (+${abs} points).`;
+    return `${side} is ahead by ${abs} pawn${abs > 1 ? "s" : ""}.`;
+  } catch {
+    return "Material balance unknown.";
+  }
+}
+
+/**
+ * Describe the position type (open/closed/semi-open) based on pawn structure.
+ */
+function getPositionType(fen) {
+  try {
+    const chess = new Chess(fen);
+    let openFiles = 0;
+    let totalPawns = 0;
+
+    const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
+    for (const file of files) {
+      let hasWhitePawn = false;
+      let hasBlackPawn = false;
+      for (let rank = 1; rank <= 8; rank++) {
+        const piece = chess.get(`${file}${rank}`);
+        if (piece?.type === "p") {
+          totalPawns++;
+          if (piece.color === "w") hasWhitePawn = true;
+          else hasBlackPawn = true;
+        }
+      }
+      if (!hasWhitePawn && !hasBlackPawn) openFiles++;
+    }
+
+    if (totalPawns <= 8) return "endgame (few pawns remaining)";
+    if (openFiles >= 3) return "open (many open files, piece activity is key)";
+    if (openFiles >= 1) return "semi-open (mixed, balance of positional and tactical play)";
+    return "closed (blocked pawn structure, long-term maneuvering)";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Check king safety — is each king still castled or has it moved to the center?
+ */
+function getKingSafety(fen) {
+  try {
+    const chess = new Chess(fen);
+    const notes = [];
+
+    for (const color of ["w", "b"]) {
+      const label = color === "w" ? "White" : "Black";
+      const squares = chess.findPiece({ type: "k", color });
+      if (squares.length === 0) continue;
+      const sq = squares[0];
+      const file = sq[0];
+      const rank = sq[1];
+
+      const isKingsideCastled = (color === "w" && sq === "g1") || (color === "b" && sq === "g8");
+      const isQueensideCastled = (color === "w" && sq === "c1") || (color === "b" && sq === "c8");
+      const isCenter = ["d", "e"].includes(file) && ["3", "4", "5", "6"].includes(rank);
+
+      if (isKingsideCastled) notes.push(`${label}'s king is safely castled kingside.`);
+      else if (isQueensideCastled) notes.push(`${label}'s king is castled queenside.`);
+      else if (isCenter) notes.push(`${label}'s king is in the CENTER — potentially vulnerable.`);
+    }
+
+    return notes.join(" ") || "King safety: both kings appear safe.";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Build the system prompt combining GM personality with structured chess context.
+ */
+function buildSystemPrompt(selectedGM, currentFen, moveHistory, topLines, openingName) {
   const gm = gmPersonalities[selectedGM];
   if (!gm) throw new Error(`Unknown GM personality: ${selectedGM}`);
 
-  // --- Position context ---
-  let chessContext = `\n\nCURRENT POSITION:\n`;
+  const chess = (() => { try { return new Chess(currentFen); } catch { return null; } })();
+  const isGameOver = chess ? (chess.isCheckmate() || chess.isDraw() || chess.isStalemate()) : false;
+  const sideToMove = chess?.turn() === "w" ? "White" : "Black";
+  const moveNum = chess?.moveNumber() ?? 1;
+
+  // ── Chess context section ──
+  let chessContext = `\n\n═══════════════════════════════════
+CURRENT POSITION (Move ${moveNum}, ${sideToMove} to play)
+═══════════════════════════════════\n`;
   chessContext += `FEN: ${currentFen}\n`;
 
+  // Opening recognition
+  if (openingName) {
+    chessContext += `Opening: ${openingName}\n`;
+  }
+
+  // Move history
   if (moveHistory && moveHistory.length > 0) {
     const formatted = moveHistory.reduce((acc, san, i) => {
       if (i % 2 === 0) return acc + `${Math.floor(i / 2) + 1}. ${san} `;
       return acc + `${san} `;
     }, "").trim();
-    chessContext += `Game so far: ${formatted}\n`;
+    chessContext += `Game moves so far: ${formatted}\n`;
   }
 
-  // --- Legal moves (hard constraint reference) ---
-  try {
-    const chess = new Chess(currentFen);
+  // Position context
+  const material = getMaterialBalance(currentFen);
+  const posType = getPositionType(currentFen);
+  const kingSafety = getKingSafety(currentFen);
+
+  chessContext += `\nPOSITION ASSESSMENT:\n`;
+  chessContext += `• ${material}\n`;
+  chessContext += `• Position type: ${posType}\n`;
+  if (kingSafety) chessContext += `• ${kingSafety}\n`;
+  if (isGameOver) chessContext += `• The game is OVER (checkmate, draw, or stalemate).\n`;
+
+  // Legal moves
+  if (chess && !isGameOver) {
     const legalMoves = chess.moves();
-    if (legalMoves.length > 0) {
-      chessContext += `Legal moves: ${legalMoves.join(", ")}\n`;
+    if (legalMoves.length > 0 && legalMoves.length <= 40) {
+      chessContext += `• Legal moves: ${legalMoves.join(", ")}\n`;
     }
-  } catch {
-    // Position may be terminal — no legal moves
   }
 
-  // --- Engine analysis (forced menu) ---
+  // Engine analysis
   if (topLines && topLines.length > 0) {
-    chessContext += `\nENGINE ANALYSIS (Stockfish — top lines):\n`;
-    chessContext += `These are the only moves you are permitted to recommend. Do not suggest any move not listed here.\n`;
+    chessContext += `\nSTOCKFISH ENGINE ANALYSIS (depth 18+):\n`;
+    chessContext += `CRITICAL: You may ONLY recommend moves that appear in these lines. Never suggest any other move.\n`;
 
     topLines.forEach((line, i) => {
       if (!line.pv || line.pv.length === 0) return;
       const evalStr = formatEval(line.score, line.mate);
-      const sanLine = formatPvLine(currentFen, line.pv, 6);
+      const sanLine = formatPvLine(currentFen, line.pv, 7);
       if (sanLine) {
-        chessContext += `Line ${i + 1} (${evalStr}): ${sanLine}\n`;
+        const label = i === 0 ? "BEST" : `Alt ${i}`;
+        chessContext += `[${label}] ${evalStr}: ${sanLine}\n`;
       }
     });
   } else {
-    chessContext += `\nEngine analysis is not yet available for this position.\n`;
-    chessContext += `If asked for a specific move, acknowledge that you are still evaluating and offer positional/strategic guidance only.\n`;
+    chessContext += `\nEngine analysis is loading or unavailable for this position.\n`;
+    chessContext += `If asked for a specific move recommendation, acknowledge the analysis is still loading and offer strategic/conceptual guidance instead.\n`;
   }
 
-  // --- Response instructions ---
-  chessContext += `\nRESPONSE INSTRUCTIONS:\n`;
-  chessContext += `- Respond in character as ${gm.name} at all times.\n`;
-  chessContext += `- You MUST only recommend moves that appear in the engine lines above. Never invent, guess, or suggest any other move.\n`;
-  chessContext += `- Match response length to the question: simple questions ("what should I play?") → 1-2 sentences. Positional or strategic questions → up to 4-5 sentences.\n`;
-  chessContext += `- When citing a move, use the SAN notation from the engine lines (e.g. "Nf3 is the right move here").\n`;
-  chessContext += `- Reference specific squares and pieces to ground your advice in the actual position.\n`;
-  chessContext += `- If asked something unrelated to chess, briefly redirect in character.\n`;
+  // Response instructions
+  chessContext += `\nRESPONSE GUIDELINES:\n`;
+  chessContext += `- Stay fully in character as ${gm.name} at ALL times. Your voice, personality, and chess philosophy must be unmistakable.\n`;
+  chessContext += `- ONLY recommend moves from the engine lines above — never invent or guess moves.\n`;
+  chessContext += `- Scale response length to the question: "Best move?" → 1-2 punchy sentences. Strategic/conceptual questions → 3-5 sentences.\n`;
+  chessContext += `- Use standard SAN notation for moves (e.g., Nf3, Bxe5+, O-O, d4).\n`;
+  chessContext += `- Reference concrete squares, pieces, and structures — ground your advice in THIS position.\n`;
+  chessContext += `- When you explain WHY a move is good, connect it to the position's key features (material, king safety, pawn structure, piece activity).\n`;
+  chessContext += `- If something is off-topic, redirect in character with a brief, sharp comment.\n`;
 
   return gm.systemPrompt + chessContext;
 }
 
 /**
  * POST /api/chat
- *
- * Body: {
- *   selectedGM: string,
- *   currentFen: string,
- *   question: string,
- *   conversationHistory: Array<{ role: string, content: string }>,
- *   moveHistory?: string[],
- *   topLines?: Array<{ pv: string[], score: number | null, mate: number | null }>
- * }
  */
 const chatLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 20,             // max 20 requests per IP per minute
+  windowMs: 60 * 1000,
+  max: 20,
   message: { error: "Too many requests. Please wait a moment before asking again." },
   standardHeaders: true,
   legacyHeaders: false,
@@ -177,13 +284,13 @@ const chatLimiter = rateLimit({
 
 app.post("/api/chat", chatLimiter, async (req, res) => {
   try {
-    const { selectedGM, currentFen, question, conversationHistory, moveHistory, topLines } = req.body;
+    const { selectedGM, currentFen, question, conversationHistory, moveHistory, topLines, openingName } = req.body;
 
     if (!question || !currentFen || !selectedGM) {
       return res.status(400).json({ error: "Missing required fields: question, currentFen, selectedGM" });
     }
 
-    const systemPrompt = buildSystemPrompt(selectedGM, currentFen, moveHistory, topLines);
+    const systemPrompt = buildSystemPrompt(selectedGM, currentFen, moveHistory, topLines, openingName);
 
     const messages = [];
 
@@ -200,7 +307,7 @@ app.post("/api/chat", chatLimiter, async (req, res) => {
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 450,
+      max_tokens: 600,
       system: systemPrompt,
       messages,
     });
