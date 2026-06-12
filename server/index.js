@@ -267,6 +267,7 @@ CURRENT POSITION (Move ${moveNum}, ${sideToMove} to play)
   chessContext += `- Reference concrete squares, pieces, and structures — ground your advice in THIS position.\n`;
   chessContext += `- When you explain WHY a move is good, connect it to the position's key features (material, king safety, pawn structure, piece activity).\n`;
   chessContext += `- If something is off-topic, redirect in character with a brief, sharp comment.\n`;
+  chessContext += `- IMPORTANT: Write in plain conversational prose — NO markdown formatting. No asterisks for bold, no hashtags for headers, no bullet dashes, no backticks. Write exactly as you would speak to someone.\n`;
 
   return gm.systemPrompt + chessContext;
 }

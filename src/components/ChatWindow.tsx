@@ -46,12 +46,26 @@ const QUICK_ASKS = [
 // Chess notation regex — piece moves, castling, captures, pawn moves
 const CHESS_MOVE_RE = /\b(O-O-O|O-O|[KQRBN][a-h]?[1-8]?x?[a-h][1-8](?:=[KQRBN])?[+#]?|[a-h]x[a-h][1-8](?:=[KQRBN])?[+#]?)\b/g;
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, "")               // ## Heading → plain text
+    .replace(/\*\*([^*\n]+)\*\*/g, "$1")        // **bold** → bold
+    .replace(/__([^_\n]+)__/g, "$1")            // __bold__ → bold
+    .replace(/\*([^*\n]+)\*/g, "$1")            // *italic* → italic
+    .replace(/_([^_\n]+)_/g, "$1")              // _italic_ → italic
+    .replace(/^[-*•]\s+/gm, "")                // - bullet → plain
+    .replace(/^[-*_]{3,}\s*$/gm, "")           // --- horizontal rule → removed
+    .replace(/`([^`]+)`/g, "$1")               // `code` → code (keep content, strip backticks)
+    .replace(/\n{3,}/g, "\n\n")                // collapse excessive blank lines
+    .trim();
+}
+
 function renderChessText(
   text: string,
   moveColor: string,
   onMoveClick?: (san: string) => void
 ) {
-  const lines = text.split("\n");
+  const lines = stripMarkdown(text).split("\n");
   return lines.map((line, lineIdx) => {
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
