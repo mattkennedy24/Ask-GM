@@ -79,7 +79,7 @@ const EvalBar: React.FC<EvalBarProps> = ({ evalScore, mateIn, thinking }) => {
         style={{
           color: labelColor,
           fontFamily: "var(--f-mono)",
-          fontSize: "10px",
+          fontSize: "15px",
           fontWeight: 600,
           opacity: isLoading ? 0.3 : 1,
           letterSpacing: "0.02em",

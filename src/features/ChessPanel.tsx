@@ -1,12 +1,14 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Chess } from "chess.js";
 import ChessBoard from "../components/ChessBoard";
 import EvalBar from "../components/EvalBar";
 import CapturedPieces from "../components/CapturedPieces";
 import EngineLines from "../components/EngineLines";
 import MoveNotation from "../components/MoveNotation";
+import PositionBrief from "../components/PositionBrief";
 import type { Arrow } from "react-chessboard/dist/chessboard/types";
 import type { EngineLineResult } from "../hooks/useStockfish";
+import type { DetectedOpening } from "../utils/openingDetection";
 
 interface ChessPanelProps {
   position: string;
@@ -28,6 +30,7 @@ interface ChessPanelProps {
   sanMoves: string[];
   historyIndex: number;
   onNavigate: (index: number) => void;
+  detectedOpening?: DetectedOpening | null;
 }
 
 const GM_COLORS: Record<string, string> = {
@@ -56,10 +59,23 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
   sanMoves,
   historyIndex,
   onNavigate,
+  detectedOpening,
 }) => {
   const [boardFlipped, setBoardFlipped] = useState(false);
   const [selectedLine, setSelectedLine] = useState(-1);
   const [pvStep, setPvStep] = useState(-1);
+  const [boardReady, setBoardReady] = useState(false);
+  const prevThinkingRef = useRef(engineThinking);
+
+  // Trigger analysis-ready ring when engine finishes
+  useEffect(() => {
+    if (prevThinkingRef.current && !engineThinking && topLines.length > 0) {
+      setBoardReady(true);
+      const t = setTimeout(() => setBoardReady(false), 750);
+      return () => clearTimeout(t);
+    }
+    prevThinkingRef.current = engineThinking;
+  }, [engineThinking, topLines.length]);
 
   const isPreviewing = selectedLine >= 0 && pvStep >= 0;
 
@@ -114,11 +130,19 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
 
   return (
     <div
-      className="panel p-3 w-full"
+      className="panel w-full overflow-hidden"
       style={{ boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}
     >
+      {/* ── Position Brief strip ── */}
+      <PositionBrief
+        fen={position}
+        evalScore={evalScore}
+        mateIn={mateIn}
+        detectedOpening={detectedOpening ?? null}
+      />
+
       {/* ── Board + eval bar row ── */}
-      <div className="flex gap-2 items-stretch">
+      <div className="flex gap-2 items-stretch p-3 pb-0">
         {/* Eval bar — desktop vertical */}
         <div className="hidden md:flex items-stretch w-4 shrink-0">
           <EvalBar evalScore={evalScore} mateIn={mateIn} thinking={engineThinking} />
@@ -127,30 +151,32 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
         {/* Board column */}
         <div className="flex-1 flex flex-col min-w-0 gap-1">
           <CapturedPieces fen={position} side="top" />
-          <ChessBoard
-            key={isPreviewing ? `pv-${selectedLine}-${pvStep}` : "game"}
-            position={isPreviewing && previewFen ? previewFen : position}
-            onMove={isPreviewing ? () => false : onMove}
-            lastMove={isPreviewing ? previewLastMove : lastMove}
-            inCheck={inCheck}
-            kingInCheckSquare={kingInCheckSquare}
-            engineArrow={isPreviewing ? null : engineArrow}
-            animationDuration={isPreviewing ? 0 : 200}
-            boardOrientation={boardFlipped ? "black" : "white"}
-          />
+          <div className={boardReady ? "analysis-ready rounded-lg" : ""}>
+            <ChessBoard
+              key={isPreviewing ? `pv-${selectedLine}-${pvStep}` : "game"}
+              position={isPreviewing && previewFen ? previewFen : position}
+              onMove={isPreviewing ? () => false : onMove}
+              lastMove={isPreviewing ? previewLastMove : lastMove}
+              inCheck={inCheck}
+              kingInCheckSquare={kingInCheckSquare}
+              engineArrow={isPreviewing ? null : engineArrow}
+              animationDuration={isPreviewing ? 0 : 200}
+              boardOrientation={boardFlipped ? "black" : "white"}
+            />
+          </div>
           <CapturedPieces fen={position} side="bottom" />
         </div>
       </div>
 
       {/* ── Eval bar — mobile horizontal ── */}
-      <div className="md:hidden mt-2 px-1">
+      <div className="md:hidden mt-2 px-3 px-1">
         <EvalBar evalScore={evalScore} mateIn={mateIn} thinking={engineThinking} />
       </div>
 
       {/* ── Move notation ── */}
       {sanMoves.length > 0 && (
         <div
-          className="mt-3 pt-3 px-1"
+          className="mt-3 pt-3 px-3 pb-0"
           style={{ borderTop: "1px solid var(--c-border)" }}
         >
           <MoveNotation
@@ -162,7 +188,7 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
       )}
 
       {/* ── Engine lines ── */}
-      <div className="mt-3">
+      <div className="mt-3 px-3 pb-0">
         <EngineLines
           topLines={topLines}
           currentFen={position}
@@ -177,7 +203,7 @@ const ChessPanel: React.FC<ChessPanelProps> = ({
 
       {/* ── Control buttons ── */}
       <div
-        className="flex flex-wrap items-center gap-1.5 mt-3 pt-3"
+        className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 px-3 pb-3"
         style={{ borderTop: "1px solid var(--c-border)" }}
       >
         {/* Navigation group */}

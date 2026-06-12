@@ -6,9 +6,7 @@ interface EngineLinesProps {
   topLines: EngineLineResult[];
   currentFen: string;
   thinking: boolean;
-  /** Index of selected line (0-based), -1 = none */
   selectedLine: number;
-  /** Current preview step within selected line, -1 = not stepping */
   pvStep: number;
   onSelectLine: (i: number) => void;
   onPvStep: (dir: 1 | -1) => void;
@@ -16,39 +14,36 @@ interface EngineLinesProps {
 }
 
 const LINE_THEME = [
-  {
-    color: "var(--c-line1)",
-    bg: "var(--c-line1-bg)",
-    border: "var(--c-line1-border)",
-    label: "Best",
-  },
-  {
-    color: "var(--c-line2)",
-    bg: "var(--c-line2-bg)",
-    border: "var(--c-line2-border)",
-    label: "Alt",
-  },
-  {
-    color: "var(--c-line3)",
-    bg: "var(--c-line3-bg)",
-    border: "var(--c-line3-border)",
-    label: "Alt",
-  },
+  { color: "var(--c-line1)", bg: "var(--c-line1-bg)", border: "var(--c-line1-border)" },
+  { color: "var(--c-line2)", bg: "var(--c-line2-bg)", border: "var(--c-line2-border)" },
+  { color: "var(--c-line3)", bg: "var(--c-line3-bg)", border: "var(--c-line3-border)" },
 ];
 
 function formatEval(score: number | null, mate: number | null): string {
-  if (mate !== null) return mate > 0 ? `M${mate}` : `M${Math.abs(mate)}`;
+  if (mate !== null) return mate > 0 ? `M${mate}` : `-M${Math.abs(mate)}`;
   if (score === null) return "—";
   if (score >= 9999) return "M";
-  if (score <= -9999) return "M";
+  if (score <= -9999) return "-M";
   const abs = Math.abs(score / 100).toFixed(2);
   return score > 0 ? `+${abs}` : score < 0 ? `-${abs}` : "0.00";
+}
+
+function evalLabel(score: number | null, mate: number | null): string {
+  if (mate !== null) return mate > 0 ? "Winning" : "Losing";
+  if (score === null) return "Unknown";
+  if (score >= 300)  return "Winning";
+  if (score >= 100)  return "Advantage";
+  if (score >= 25)   return "Slight edge";
+  if (score > -25)   return "Equal";
+  if (score > -100)  return "Slight risk";
+  if (score > -300)  return "Disadvantage";
+  return "Losing";
 }
 
 interface LineToken {
   text: string;
   kind: "number" | "move";
-  moveIdx: number; // which pv index this move corresponds to (-1 for number tokens)
+  moveIdx: number;
 }
 
 function buildTokens(fen: string, pvMoves: string[], maxMoves = 6): LineToken[] {
@@ -66,16 +61,12 @@ function buildTokens(fen: string, pvMoves: string[], maxMoves = 6): LineToken[] 
         tokens.push({ text: `${moveNum}…`, kind: "number", moveIdx: -1 });
       }
 
-      const result = chess.move({
-        from: uci.slice(0, 2),
-        to: uci.slice(2, 4),
-        promotion: uci[4] ?? "q",
-      });
+      const result = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] ?? "q" });
       if (!result) return;
 
       tokens.push({ text: result.san, kind: "move", moveIdx: i });
     } catch {
-      // Stop on illegal move
+      // stop on illegal move
     }
   });
 
@@ -96,7 +87,8 @@ const EngineLines: React.FC<EngineLinesProps> = ({
     return topLines.map((line) => ({
       ...line,
       evalStr: formatEval(line.score, line.mate),
-      tokens: buildTokens(currentFen, line.pv),
+      label: evalLabel(line.score, line.mate),
+      tokens: buildTokens(currentFen, line.pv, 7),
     }));
   }, [topLines, currentFen]);
 
@@ -121,7 +113,7 @@ const EngineLines: React.FC<EngineLinesProps> = ({
             {[0, 1, 2].map((i) => (
               <span
                 key={i}
-                className={`thinking-bar inline-block w-0.5 rounded-full`}
+                className="thinking-bar inline-block w-0.5 rounded-full"
                 style={{
                   height: i === 1 ? "10px" : "6px",
                   background: "var(--c-text-muted)",
@@ -133,8 +125,8 @@ const EngineLines: React.FC<EngineLinesProps> = ({
         )}
       </div>
 
-      {/* ── Lines ── */}
-      <div className="p-2 space-y-1">
+      {/* ── Move cards ── */}
+      <div className="p-2 space-y-1.5">
         {processedLines.length === 0 ? (
           <div
             className="py-4 text-center text-xs"
@@ -147,53 +139,98 @@ const EngineLines: React.FC<EngineLinesProps> = ({
             const theme = LINE_THEME[i] ?? LINE_THEME[2];
             const isSelected = selectedLine === i;
 
+            // Split tokens: first move vs rest
+            const firstMoveToken = line.tokens.find((t) => t.kind === "move" && t.moveIdx === 0);
+            const restTokens = line.tokens.filter((t) => t !== firstMoveToken || t.moveIdx !== 0);
+            // Number token before the first move (may be the very first token)
+            const numToken = line.tokens[0]?.kind === "number" ? line.tokens[0] : null;
+
             return (
               <button
                 key={i}
                 onClick={() => onSelectLine(isSelected ? -1 : i)}
-                className="w-full text-left px-3 py-2 rounded-lg transition-all duration-150 group"
+                className="w-full text-left rounded-lg transition-all duration-150 engine-card overflow-hidden"
                 style={{
-                  background: isSelected ? theme.bg : "transparent",
-                  border: `1px solid ${isSelected ? theme.border : "transparent"}`,
+                  background: isSelected ? theme.bg : "var(--c-surface)",
+                  border: `1px solid ${isSelected ? theme.border : "var(--c-border)"}`,
                 }}
               >
-                <div className="flex items-start gap-3 min-w-0">
-                  {/* Eval badge */}
-                  <span
-                    className="text-xs font-semibold tabular-nums shrink-0 mt-0.5 w-11 text-right"
-                    style={{ color: theme.color, fontFamily: "var(--f-mono)" }}
-                  >
-                    {line.evalStr}
-                  </span>
+                {/* ── Card top: eval + first move ── */}
+                <div className="flex items-center gap-2.5 px-3 py-2">
+                  {/* Eval section */}
+                  <div className="flex flex-col items-start shrink-0" style={{ minWidth: "80px" }}>
+                    <span
+                      className="text-xs font-semibold tabular-nums leading-tight"
+                      style={{ color: theme.color, fontFamily: "var(--f-mono)" }}
+                    >
+                      {line.evalStr}
+                    </span>
+                    <span
+                      className="text-xs leading-tight mt-0.5"
+                      style={{ color: "var(--c-text-muted)", fontFamily: "var(--f-sans)", fontSize: "10px" }}
+                    >
+                      {line.label}
+                    </span>
+                  </div>
 
-                  {/* Move tokens */}
-                  <span
-                    className="text-xs leading-relaxed flex flex-wrap gap-x-1 min-w-0"
-                    style={{ fontFamily: "var(--f-mono)" }}
+                  {/* Divider */}
+                  <div className="self-stretch w-px shrink-0" style={{ background: theme.border, opacity: 0.6 }} />
+
+                  {/* First move — prominent */}
+                  <div className="flex items-baseline gap-1 min-w-0">
+                    {numToken && (
+                      <span
+                        className="text-xs"
+                        style={{ color: "var(--c-text-muted)", fontFamily: "var(--f-mono)" }}
+                      >
+                        {numToken.text}
+                      </span>
+                    )}
+                    {firstMoveToken && (
+                      <span
+                        className="font-bold rounded px-1"
+                        style={{
+                          fontFamily: "var(--f-mono)",
+                          fontSize: "15px",
+                          color: isSelected ? "#fff" : theme.color,
+                          background: isSelected ? theme.color : `${theme.color}15`,
+                          letterSpacing: "0.01em",
+                          transition: "background 150ms ease, color 150ms ease",
+                        }}
+                      >
+                        {firstMoveToken.text}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Card bottom: continuation ── */}
+                {restTokens.some((t) => t.kind === "move") && (
+                  <div
+                    className="flex flex-wrap gap-x-1 px-3 pb-2 pt-0"
+                    style={{ borderTop: `1px solid ${theme.border}`, paddingTop: "5px" }}
                   >
-                    {line.tokens.map((token, j) => {
+                    {restTokens.map((token, j) => {
                       const isMoveActive = isSelected && token.moveIdx === pvStep;
-                      const isFirstMove = token.moveIdx === 0;
-
                       if (token.kind === "number") {
                         return (
-                          <span key={j} style={{ color: "var(--c-text-muted)" }}>
+                          <span
+                            key={j}
+                            className="text-xs"
+                            style={{ color: "var(--c-text-muted)", fontFamily: "var(--f-mono)" }}
+                          >
                             {token.text}
                           </span>
                         );
                       }
-
                       return (
                         <span
                           key={j}
-                          className="rounded px-0.5 transition-colors"
+                          className="text-xs rounded px-0.5 transition-colors"
                           style={{
-                            color: isMoveActive
-                              ? "#fff"
-                              : isFirstMove
-                              ? "var(--c-text)"
-                              : "var(--c-text-soft)",
-                            fontWeight: isFirstMove ? 600 : 400,
+                            fontFamily: "var(--f-mono)",
+                            color: isMoveActive ? "#fff" : "var(--c-text-soft)",
+                            fontWeight: isMoveActive ? 600 : 400,
                             background: isMoveActive ? theme.color : "transparent",
                           }}
                         >
@@ -201,35 +238,27 @@ const EngineLines: React.FC<EngineLinesProps> = ({
                         </span>
                       );
                     })}
-                  </span>
-                </div>
+                  </div>
+                )}
               </button>
             );
           })
         )}
       </div>
 
-      {/* ── Step controls (visible when a line is selected) ── */}
+      {/* ── Step controls ── */}
       {selectedLine >= 0 && (
         <div
           className="flex items-center gap-2 px-3 py-2.5 flex-wrap"
           style={{ borderTop: "1px solid var(--c-border)" }}
         >
-          <button
-            className="btn text-xs px-2 py-1"
-            onClick={() => onPvStep(-1)}
-            disabled={pvStep <= 0}
-          >
+          <button className="btn text-xs px-2 py-1" onClick={() => onPvStep(-1)} disabled={pvStep <= 0}>
             ← Prev
           </button>
-          <button
-            className="btn text-xs px-2 py-1"
-            onClick={() => onPvStep(1)}
-            disabled={pvStep >= activePvLength - 1}
-          >
+          <button className="btn text-xs px-2 py-1" onClick={() => onPvStep(1)} disabled={pvStep >= activePvLength - 1}>
             Next →
           </button>
-          {isPreviewing && (
+          {isPreviewing ? (
             <>
               <span
                 className="text-xs tabular-nums"
@@ -245,12 +274,14 @@ const EngineLines: React.FC<EngineLinesProps> = ({
                 ✕ Exit
               </button>
             </>
-          )}
-          {!isPreviewing && (
+          ) : (
             <button
               className="btn text-xs px-2 py-1"
               onClick={() => onPvStep(1)}
-              style={{ borderColor: LINE_THEME[selectedLine]?.color, color: LINE_THEME[selectedLine]?.color }}
+              style={{
+                borderColor: LINE_THEME[selectedLine]?.color,
+                color: LINE_THEME[selectedLine]?.color,
+              }}
             >
               ▶ Step through
             </button>
@@ -259,15 +290,9 @@ const EngineLines: React.FC<EngineLinesProps> = ({
       )}
 
       {/* ── Footer ── */}
-      {!selectedLine && selectedLine !== 0 && (
-        <div
-          className="px-4 py-2"
-          style={{ borderTop: "1px solid var(--c-border)" }}
-        >
-          <p
-            className="text-xs"
-            style={{ color: "var(--c-text-muted)", fontFamily: "var(--f-mono)" }}
-          >
+      {selectedLine < 0 && (
+        <div className="px-4 py-2" style={{ borderTop: "1px solid var(--c-border)" }}>
+          <p className="text-xs" style={{ color: "var(--c-text-muted)", fontFamily: "var(--f-mono)" }}>
             GM advice is grounded in these lines
           </p>
         </div>
