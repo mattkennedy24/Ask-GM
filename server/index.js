@@ -272,6 +272,72 @@ CURRENT POSITION (Move ${moveNum}, ${sideToMove} to play)
 }
 
 /**
+ * Sanitize user input: strip control chars, enforce max length.
+ */
+function sanitizeInput(value, maxLen = 1000) {
+  if (typeof value !== "string") return "";
+  // Remove control characters (except \n \t which are fine in text)
+  return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").slice(0, maxLen);
+}
+
+/**
+ * Classify question to determine expected response length.
+ * Returns "tactical" | "conceptual" | "theory"
+ */
+function classifyQuestion(question) {
+  const q = question.toLowerCase();
+  if (/\b(best move|what('s| is) the move|blunder|tactic|checkmate|mate in|combination|fork|pin|skewer|sacrifice|trap)\b/.test(q)) {
+    return "tactical";
+  }
+  if (/\b(opening|theory|variation|line|gambit|sicilian|french|caro|slav|indian|ruy|london|catalan|nimzo|grünfeld|grunfeld)\b/.test(q)) {
+    return "theory";
+  }
+  return "conceptual";
+}
+
+/**
+ * Extract SAN tokens from a text string.
+ */
+function extractSanTokens(text) {
+  const SAN_RE = /\b(O-O-O|O-O|[KQRBN][a-h]?[1-8]?x?[a-h][1-8](?:=[KQRBN])?[+#]?|[a-h][1-8]|[a-h]x[a-h][1-8](?:=[KQRBN])?[+#]?)\b/g;
+  return [...text.matchAll(SAN_RE)].map(m => m[0]);
+}
+
+/**
+ * Validate that all recommended moves in a response are legal in the position.
+ * Returns { valid: boolean, illegalMoves: string[] }
+ */
+function validateResponseMoves(responseText, fen) {
+  try {
+    const chess = new Chess(fen);
+    const legalSans = new Set(chess.moves());
+    const mentioned = extractSanTokens(responseText);
+    const illegalMoves = mentioned.filter(san => !legalSans.has(san));
+    return { valid: illegalMoves.length === 0, illegalMoves };
+  } catch {
+    return { valid: true, illegalMoves: [] };
+  }
+}
+
+/**
+ * Parse FOLLOWUPS from a response and return { text, followUps }.
+ * The model is instructed to append: FOLLOWUPS: q1 | q2 | q3
+ */
+function parseFollowUps(rawText) {
+  const marker = /\nFOLLOWUPS:\s*(.+)$/i;
+  const match = rawText.match(marker);
+  if (!match) return { text: rawText.trim(), followUps: [] };
+
+  const text = rawText.slice(0, match.index).trim();
+  const followUps = match[1]
+    .split("|")
+    .map(s => s.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  return { text, followUps };
+}
+
+/**
  * POST /api/chat
  */
 const chatLimiter = rateLimit({
@@ -284,36 +350,76 @@ const chatLimiter = rateLimit({
 
 app.post("/api/chat", chatLimiter, async (req, res) => {
   try {
-    const { selectedGM, currentFen, question, conversationHistory, moveHistory, topLines, openingName } = req.body;
+    let { selectedGM, currentFen, question, conversationHistory, moveHistory, topLines, openingName } = req.body;
 
     if (!question || !currentFen || !selectedGM) {
       return res.status(400).json({ error: "Missing required fields: question, currentFen, selectedGM" });
     }
 
+    // ── Input sanitization ──
+    question = sanitizeInput(question, 1000);
+    if (!question) return res.status(400).json({ error: "Question is empty after sanitization." });
+
+    if (!Array.isArray(topLines)) topLines = [];
+    topLines = topLines.slice(0, 5);
+
+    if (!Array.isArray(conversationHistory)) conversationHistory = [];
+    conversationHistory = conversationHistory.slice(-10);
+
+    if (!Array.isArray(moveHistory)) moveHistory = [];
+    moveHistory = moveHistory.slice(0, 200);
+
+    // ── Question classification → response length hint ──
+    const qClass = classifyQuestion(question);
+    const lengthHint =
+      qClass === "tactical"   ? "1-2 punchy sentences (it's a direct move question)" :
+      qClass === "theory"     ? "4-5 sentences (opening theory deserves context)" :
+                                "3-4 sentences (strategic/conceptual question)";
+
     const systemPrompt = buildSystemPrompt(selectedGM, currentFen, moveHistory, topLines, openingName);
 
+    // Append question classification + follow-up instructions to the system prompt
+    const fullSystemPrompt = systemPrompt +
+      `\n\nRESPONSE LENGTH FOR THIS QUESTION: ${lengthHint}\n` +
+      `After your response, on a new line append exactly: FOLLOWUPS: <q1> | <q2> | <q3>\n` +
+      `where q1/q2/q3 are 3 short natural follow-up questions a student might ask next (5-8 words each, chess-specific to this position). ` +
+      `Do not number them. Do not put quotes around them. The FOLLOWUPS line must always be present.`;
+
     const messages = [];
-
-    if (conversationHistory && conversationHistory.length > 0) {
-      for (const msg of conversationHistory) {
-        messages.push({
-          role: msg.role === "You" ? "user" : "assistant",
-          content: msg.content,
-        });
-      }
+    for (const msg of conversationHistory) {
+      messages.push({
+        role: msg.role === "You" ? "user" : "assistant",
+        content: typeof msg.content === "string" ? sanitizeInput(msg.content, 2000) : "",
+      });
     }
-
     messages.push({ role: "user", content: question });
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 600,
-      system: systemPrompt,
-      messages,
-    });
+    const callClaude = async () =>
+      anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 700,
+        system: fullSystemPrompt,
+        messages,
+      });
 
-    const text = response.content[0].text;
-    res.json({ response: text });
+    let response = await callClaude();
+    let rawText = response.content[0].text;
+
+    // ── Move validation with single retry ──
+    const { valid, illegalMoves } = validateResponseMoves(rawText, currentFen);
+    if (!valid && illegalMoves.length > 0) {
+      messages.push({ role: "assistant", content: rawText });
+      messages.push({
+        role: "user",
+        content: `The move(s) ${illegalMoves.join(", ")} are not legal in this position. ` +
+          `Please correct your response using only legal moves from the engine analysis provided.`,
+      });
+      response = await callClaude();
+      rawText = response.content[0].text;
+    }
+
+    const { text, followUps } = parseFollowUps(rawText);
+    res.json({ response: text, followUps });
   } catch (error) {
     console.error("Chat API error:", error.message);
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { DetectedOpening } from "../utils/openingDetection";
 
-type Message = { sender: string; text: string };
+type Message = { sender: string; text: string; fen?: string; followUps?: string[] };
 
 type ChatWindowProps = {
   messages: Message[];
@@ -9,6 +9,7 @@ type ChatWindowProps = {
   thinking?: boolean;
   selectedGM?: string;
   detectedOpening?: DetectedOpening | null;
+  onMoveClick?: (san: string) => void;
 };
 
 const GM_COLORS: Record<string, string> = {
@@ -42,10 +43,14 @@ const QUICK_ASKS = [
   "Why this engine move?",
 ];
 
-// Chess notation regex — piece moves, castling, captures
-const CHESS_MOVE_RE = /\b(O-O-O|O-O|[KQRBN][a-h]?[1-8]?x?[a-h][1-8](?:=[KQRBN])?[+#]?)\b/g;
+// Chess notation regex — piece moves, castling, captures, pawn moves
+const CHESS_MOVE_RE = /\b(O-O-O|O-O|[KQRBN][a-h]?[1-8]?x?[a-h][1-8](?:=[KQRBN])?[+#]?|[a-h]x[a-h][1-8](?:=[KQRBN])?[+#]?)\b/g;
 
-function renderChessText(text: string, moveColor: string) {
+function renderChessText(
+  text: string,
+  moveColor: string,
+  onMoveClick?: (san: string) => void
+) {
   const lines = text.split("\n");
   return lines.map((line, lineIdx) => {
     const parts: React.ReactNode[] = [];
@@ -57,21 +62,23 @@ function renderChessText(text: string, moveColor: string) {
       if (match.index > lastIndex) {
         parts.push(line.slice(lastIndex, match.index));
       }
+      const san = match[0];
       parts.push(
         <span
           key={`m-${lineIdx}-${match.index}`}
+          className="move-token"
+          role={onMoveClick ? "button" : undefined}
+          tabIndex={onMoveClick ? 0 : undefined}
+          onClick={onMoveClick ? () => onMoveClick(san) : undefined}
+          onKeyDown={onMoveClick ? (e) => { if (e.key === "Enter" || e.key === " ") onMoveClick(san); } : undefined}
+          title={onMoveClick ? `Play ${san}` : undefined}
           style={{
-            fontFamily: "var(--f-mono)",
-            fontSize: "0.85em",
-            fontWeight: 600,
             color: moveColor,
-            background: `${moveColor}14`,
-            borderRadius: "3px",
-            padding: "0 3px",
-            letterSpacing: "0.02em",
+            background: `${moveColor}18`,
+            border: onMoveClick ? `1px solid ${moveColor}30` : "none",
           }}
         >
-          {match[0]}
+          {san}
         </span>
       );
       lastIndex = CHESS_MOVE_RE.lastIndex;
@@ -90,18 +97,44 @@ function renderChessText(text: string, moveColor: string) {
   });
 }
 
-const ChatWindow = ({ messages, onSubmit, thinking, selectedGM = "Magnus", detectedOpening }: ChatWindowProps) => {
+const ChatWindow = ({
+  messages,
+  onSubmit,
+  thinking,
+  selectedGM = "Magnus",
+  detectedOpening,
+  onMoveClick,
+}: ChatWindowProps) => {
   const [input, setInput] = useState("");
+  const [sendConfirm, setSendConfirm] = useState(false);
+  const [avatarPulse, setAvatarPulse] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const prevMessageCountRef = useRef(messages.length);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, thinking]);
 
+  // Trigger avatar pulse when a new GM message arrives
+  useEffect(() => {
+    const prev = prevMessageCountRef.current;
+    const curr = messages.length;
+    if (curr > prev) {
+      const lastMsg = messages[curr - 1];
+      if (lastMsg.sender !== "You") {
+        setAvatarPulse(true);
+        setTimeout(() => setAvatarPulse(false), 400);
+      }
+    }
+    prevMessageCountRef.current = curr;
+  }, [messages]);
+
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed) return;
+    setSendConfirm(true);
+    setTimeout(() => setSendConfirm(false), 400);
     onSubmit(trimmed);
     setInput("");
     inputRef.current?.focus();
@@ -114,6 +147,11 @@ const ChatWindow = ({ messages, onSubmit, thinking, selectedGM = "Magnus", detec
 
   const hasOnlyWelcome = messages.length === 1;
 
+  // Find follow-ups from the last GM message
+  const lastGmMessage = [...messages].reverse().find((m) => m.sender !== "You");
+  const followUps = lastGmMessage?.followUps ?? [];
+  const showFollowUps = !thinking && followUps.length > 0 && !hasOnlyWelcome;
+
   return (
     <div className="panel flex flex-col h-full min-h-0 overflow-hidden">
 
@@ -124,7 +162,7 @@ const ChatWindow = ({ messages, onSubmit, thinking, selectedGM = "Magnus", detec
       >
         {/* GM avatar */}
         <span
-          className="inline-flex items-center justify-center w-8 h-8 rounded-full shrink-0"
+          className={`inline-flex items-center justify-center w-8 h-8 rounded-full shrink-0 ${avatarPulse ? "avatar-pulse" : ""}`}
           style={{
             background: `${gmColor}20`,
             border: `1.5px solid ${gmColor}55`,
@@ -163,7 +201,7 @@ const ChatWindow = ({ messages, onSubmit, thinking, selectedGM = "Magnus", detec
       {/* ── Messages ── */}
       <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3 space-y-2.5">
 
-        {/* Welcome state — show quick-start prompts when only the intro message exists */}
+        {/* Welcome state — show when only the intro message exists */}
         {hasOnlyWelcome && (
           <div className="flex justify-start">
             <span
@@ -186,6 +224,7 @@ const ChatWindow = ({ messages, onSubmit, thinking, selectedGM = "Magnus", detec
 
         {!hasOnlyWelcome && messages.map((msg, i) => {
           const isUser = msg.sender === "You";
+          const isLastGm = !isUser && i === messages.length - 1;
           return (
             <div
               key={i}
@@ -197,27 +236,63 @@ const ChatWindow = ({ messages, onSubmit, thinking, selectedGM = "Magnus", detec
                   style={{ background: gmColor, minHeight: "1rem" }}
                 />
               )}
-              <div
-                className="max-w-[88%] text-sm leading-relaxed rounded-xl px-3.5 py-2.5"
-                style={
-                  isUser
-                    ? {
-                        background: "var(--c-raised)",
-                        border: "1px solid var(--c-border-mid)",
-                        color: "var(--c-text)",
-                        borderBottomRightRadius: "4px",
-                      }
-                    : {
-                        background: "var(--c-hover)",
-                        border: "1px solid var(--c-border-mid)",
-                        color: "var(--c-text)",
-                        borderBottomLeftRadius: "4px",
-                      }
-                }
-              >
-                {isUser
-                  ? msg.text
-                  : renderChessText(msg.text, gmColor)}
+              <div className="flex flex-col max-w-[88%] gap-1.5">
+                <div
+                  className="text-sm leading-relaxed rounded-xl px-3.5 py-2.5"
+                  style={
+                    isUser
+                      ? {
+                          background: "var(--c-raised)",
+                          border: "1px solid var(--c-border-mid)",
+                          color: "var(--c-text)",
+                          borderBottomRightRadius: "4px",
+                        }
+                      : {
+                          background: "var(--c-hover)",
+                          border: "1px solid var(--c-border-mid)",
+                          color: "var(--c-text)",
+                          borderBottomLeftRadius: "4px",
+                        }
+                  }
+                >
+                  {isUser
+                    ? msg.text
+                    : renderChessText(msg.text, gmColor, onMoveClick)}
+                </div>
+
+                {/* Follow-up chips under the last GM message */}
+                {isLastGm && showFollowUps && (
+                  <div className="flex flex-wrap gap-1.5 mt-0.5">
+                    {followUps.map((q, qi) => (
+                      <button
+                        key={qi}
+                        onClick={() => onSubmit(q)}
+                        disabled={thinking}
+                        className="chip-in text-xs px-2.5 py-1 rounded-full disabled:opacity-40"
+                        style={{
+                          background: "var(--c-raised)",
+                          border: `1px solid ${gmColor}33`,
+                          color: gmColor,
+                          fontFamily: "var(--f-sans)",
+                          whiteSpace: "nowrap",
+                          transition: "background 150ms ease, border-color 150ms ease",
+                          cursor: "pointer",
+                          animationDelay: `${qi * 0.07}s`,
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.background = `${gmColor}18`;
+                          (e.currentTarget as HTMLButtonElement).style.borderColor = gmColor;
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.background = "var(--c-raised)";
+                          (e.currentTarget as HTMLButtonElement).style.borderColor = `${gmColor}33`;
+                        }}
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -348,13 +423,14 @@ const ChatWindow = ({ messages, onSubmit, thinking, selectedGM = "Magnus", detec
         <button
           onClick={handleSend}
           disabled={!input.trim() || thinking}
-          className="shrink-0 px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          className={`shrink-0 px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed ${sendConfirm ? "send-confirm" : ""}`}
           style={{
             background: `${gmColor}22`,
             border: `1px solid ${gmColor}66`,
-            color: gmColor,
+            color: sendConfirm ? "var(--c-text)" : gmColor,
             fontFamily: "var(--f-sans)",
             transition: "background 150ms ease, box-shadow 150ms ease, transform 80ms ease",
+            minWidth: "56px",
           }}
           onMouseEnter={(e) => {
             if (!(e.currentTarget as HTMLButtonElement).disabled) {
@@ -375,7 +451,7 @@ const ChatWindow = ({ messages, onSubmit, thinking, selectedGM = "Magnus", detec
             (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
           }}
         >
-          Send
+          {sendConfirm ? "✓" : "Send"}
         </button>
       </div>
     </div>

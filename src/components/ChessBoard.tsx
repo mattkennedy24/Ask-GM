@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import type {
@@ -37,6 +37,7 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
     from: Square;
     to: Square;
   } | null>(null);
+  const isDragging = useRef(false);
 
   useEffect(() => {
     setSelectedSquare(null);
@@ -110,6 +111,8 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
 
   const handleSquareClick = useCallback(
     (square: Square) => {
+      // Ignore click events that are the tail of a drag operation
+      if (isDragging.current) return;
       const chess = new Chess(position);
 
       if (!selectedSquare) {
@@ -152,13 +155,18 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   );
 
   const handlePieceDragBegin = useCallback(
-    (_piece: Piece, square: Square) => { selectSquare(square); },
+    (_piece: Piece, square: Square) => {
+      isDragging.current = true;
+      selectSquare(square);
+    },
     [selectSquare]
   );
 
   const handlePieceDragEnd = useCallback(() => {
     setSelectedSquare(null);
     setLegalMoveSquares([]);
+    // Keep isDragging true briefly so the following click event is suppressed
+    setTimeout(() => { isDragging.current = false; }, 50);
   }, []);
 
   const handlePromotionPieceSelect = useCallback(
@@ -178,6 +186,7 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   return (
     <div
       className="w-full rounded-lg overflow-hidden"
+      onContextMenu={(e) => e.preventDefault()}
       style={{
         background: "var(--c-raised)",
         boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)",

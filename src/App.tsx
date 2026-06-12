@@ -12,7 +12,7 @@ import type { Opening } from "./data/openings";
 import { detectOpening } from "./utils/openingDetection";
 import type { DetectedOpening } from "./utils/openingDetection";
 
-type ChatMessage = { sender: string; text: string };
+type ChatMessage = { sender: string; text: string; fen?: string; followUps?: string[] };
 type AppTab = "game" | "openings";
 
 async function askGM(payload: {
@@ -23,7 +23,7 @@ async function askGM(payload: {
   moveHistory?: string[];
   topLines?: EngineLineResult[];
   openingName?: string;
-}): Promise<string> {
+}): Promise<{ response: string; followUps: string[] }> {
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: {
@@ -39,7 +39,7 @@ async function askGM(payload: {
   }
 
   const data = await res.json();
-  return data.response;
+  return { response: data.response ?? "", followUps: Array.isArray(data.followUps) ? data.followUps : [] };
 }
 
 function App() {
@@ -206,7 +206,7 @@ function App() {
         moveHistory = sanMoves.slice(0, historyIndex);
       }
 
-      const response = await askGM({
+      const { response, followUps } = await askGM({
         selectedGM,
         currentFen: contextFen,
         question: enrichedQuestion,
@@ -216,7 +216,10 @@ function App() {
         openingName: openingNameForServer,
       });
 
-      setChatMessages((msgs) => [...msgs, { sender: "GM", text: response }]);
+      setChatMessages((msgs) => [
+        ...msgs,
+        { sender: "GM", text: response, fen: contextFen, followUps },
+      ]);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : "Something went wrong";
       setChatMessages((msgs) => [...msgs, { sender: "GM", text: `Error: ${errMsg}` }]);
@@ -224,6 +227,20 @@ function App() {
       setThinking(false);
     }
   };
+
+  const handleGMMove = useCallback(
+    (san: string) => {
+      const chess = new Chess(currentFen);
+      try {
+        const move = chess.move(san);
+        if (!move) return;
+        handleMove(move.from, move.to, move.promotion);
+      } catch {
+        // ignore invalid san
+      }
+    },
+    [currentFen] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const handleQuickAsk = () => handleQuestion("What should I play here?");
 
@@ -464,6 +481,7 @@ function App() {
               sanMoves={sanMoves}
               historyIndex={historyIndex}
               onNavigate={handleNavigate}
+              detectedOpening={activeTab === "game" ? detectedOpening : null}
             />
           </div>
         </div>
@@ -520,6 +538,7 @@ function App() {
               thinking={thinking}
               selectedGM={selectedGM}
               detectedOpening={detectedOpening}
+              onMoveClick={handleGMMove}
             />
           </div>
         </div>

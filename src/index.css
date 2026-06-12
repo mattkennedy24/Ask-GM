@@ -2,32 +2,32 @@
 @import "tailwindcss";
 
 :root {
-  /* ── Backgrounds ── */
-  --c-bg:       #08080E;
-  --c-surface:  #0E0E17;
-  --c-raised:   #151521;
-  --c-hover:    #1C1C2A;
+  /* ── Backgrounds — pure charcoal, zero color cast ── */
+  --c-bg:       #0A0A0A;
+  --c-surface:  #111111;
+  --c-raised:   #1A1A1A;
+  --c-hover:    #222222;
 
-  /* ── Borders ── */
-  --c-border:        #1A1A2A;
-  --c-border-mid:    #242438;
-  --c-border-bright: #303048;
+  /* ── Borders — pure gray ── */
+  --c-border:        #1E1E1E;
+  --c-border-mid:    #2A2A2A;
+  --c-border-bright: #383838;
 
-  /* ── Gold accent — brass lamp in a mahogany study ── */
-  --c-gold:       #C89040;
-  --c-gold-bright:#E4A84C;
-  --c-gold-dim:   rgba(200, 144, 64, 0.14);
-  --c-gold-glow:  rgba(200, 144, 64, 0.08);
-  --c-gold-ring:  rgba(200, 144, 64, 0.35);
+  /* ── Amber accent — single electric accent ── */
+  --c-gold:       #D4820A;
+  --c-gold-bright:#E8960E;
+  --c-gold-dim:   rgba(212, 130, 10, 0.14);
+  --c-gold-glow:  rgba(212, 130, 10, 0.08);
+  --c-gold-ring:  rgba(212, 130, 10, 0.35);
 
-  /* ── Interactive blue ── */
-  --c-blue:     #4674E8;
-  --c-blue-dim: rgba(70, 116, 232, 0.12);
+  /* ── Interactive (kept for compatibility) ── */
+  --c-blue:     #4A7AE8;
+  --c-blue-dim: rgba(74, 122, 232, 0.12);
 
-  /* ── Engine line colors — tactical beams ── */
-  --c-line1:        #38C87A;
-  --c-line1-bg:     rgba(56, 200, 122, 0.07);
-  --c-line1-border: rgba(56, 200, 122, 0.22);
+  /* ── Engine line colors ── */
+  --c-line1:        #3FC87A;
+  --c-line1-bg:     rgba(63, 200, 122, 0.07);
+  --c-line1-border: rgba(63, 200, 122, 0.22);
 
   --c-line2:        #E89C20;
   --c-line2-bg:     rgba(232, 156, 32, 0.06);
@@ -38,14 +38,14 @@
   --c-line3-border: rgba(104, 128, 164, 0.16);
 
   /* ── GM identity colors ── */
-  --c-gm-magnus: #4674E8;
-  --c-gm-hikaru: #E87C20;
-  --c-gm-bobby:  #C84848;
+  --c-gm-magnus: #4A7AE8;
+  --c-gm-hikaru: #E88020;
+  --c-gm-bobby:  #D44040;
 
   /* ── Text ── */
-  --c-text:       #DDD8CF;
-  --c-text-soft:  #8A8898;
-  --c-text-muted: #4C4A5C;
+  --c-text:       #F0F0F0;
+  --c-text-soft:  #888888;
+  --c-text-muted: #444444;
 
   /* ── Typography ── */
   --f-serif: 'Cormorant Garamond', Georgia, serif;
@@ -53,9 +53,9 @@
   --f-sans:  'DM Sans', system-ui, sans-serif;
 
   /* ── Transitions ── */
-  --t-fast:   100ms ease;
-  --t-base:   150ms ease;
-  --t-slow:   250ms ease;
+  --t-fast: 100ms ease;
+  --t-base: 150ms ease;
+  --t-slow: 250ms ease;
 }
 
 *, *::before, *::after {
@@ -65,6 +65,9 @@
 html, body, #root {
   height: 100%;
   margin: 0;
+  /* Safe area for iPhone notch / Dynamic Island */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 body {
@@ -83,7 +86,7 @@ body {
 }
 
 /* ── Refined scrollbars ── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar       { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--c-border-bright);
@@ -109,8 +112,11 @@ body {
     color: var(--c-text-soft);
     font-family: var(--f-sans);
     letter-spacing: 0.01em;
-    transition: background var(--t-base), border-color var(--t-base), color var(--t-base), box-shadow var(--t-base), transform var(--t-fast);
+    transition: background var(--t-base), border-color var(--t-base),
+                color var(--t-base), box-shadow var(--t-base), transform var(--t-fast);
     cursor: pointer;
+    /* Ensure 44px min tap target on touch */
+    min-height: 36px;
   }
   .btn:hover:not(:disabled) {
     background: var(--c-hover);
@@ -118,13 +124,8 @@ body {
     color: var(--c-gold-bright);
     box-shadow: 0 0 0 1px var(--c-gold-glow);
   }
-  .btn:active:not(:disabled) {
-    transform: scale(0.97);
-  }
-  .btn:disabled {
-    cursor: not-allowed;
-    opacity: 0.35;
-  }
+  .btn:active:not(:disabled) { transform: scale(0.97); }
+  .btn:disabled { cursor: not-allowed; opacity: 0.35; }
   .btn:focus-visible {
     outline: 2px solid var(--c-gold-ring);
     outline-offset: 2px;
@@ -139,18 +140,14 @@ body {
     letter-spacing: 0.01em;
     transition: background var(--t-base), box-shadow var(--t-base), transform var(--t-fast);
     cursor: pointer;
+    min-height: 36px;
   }
   .btn-primary:hover:not(:disabled) {
-    background: rgba(200, 144, 64, 0.22);
+    background: rgba(212, 130, 10, 0.22);
     box-shadow: 0 0 12px var(--c-gold-glow);
   }
-  .btn-primary:active:not(:disabled) {
-    transform: scale(0.97);
-  }
-  .btn-primary:disabled {
-    cursor: not-allowed;
-    opacity: 0.35;
-  }
+  .btn-primary:active:not(:disabled) { transform: scale(0.97); }
+  .btn-primary:disabled { cursor: not-allowed; opacity: 0.35; }
 
   .panel {
     background: var(--c-surface);
@@ -158,9 +155,24 @@ body {
     border-radius: 0.875rem;
     transition: border-color var(--t-slow);
   }
-  .panel:focus-within {
-    border-color: var(--c-border-mid);
+  .panel:focus-within { border-color: var(--c-border-mid); }
+
+  /* Clickable move token inside GM chat responses */
+  .move-token {
+    font-family: var(--f-mono);
+    font-size: 0.85em;
+    font-weight: 600;
+    border-radius: 4px;
+    padding: 1px 4px;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    display: inline-block;
+    transition: background var(--t-base), color var(--t-base), transform var(--t-fast);
+    /* 28px min touch target height via line-height trick */
+    line-height: 1.6;
   }
+  .move-token:hover  { filter: brightness(1.2); transform: scale(1.04); }
+  .move-token:active { transform: scale(0.97); }
 }
 
 /* ── Thinking animation ── */
@@ -175,26 +187,61 @@ body {
 .thinking-bar:nth-child(2) { animation-delay: 0.18s; }
 .thinking-bar:nth-child(3) { animation-delay: 0.36s; }
 
-/* ── Fade-in for new chat messages ── */
+/* ── Message entrance animation ── */
 @keyframes msg-in {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(5px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.msg-in {
-  animation: msg-in 0.2s ease forwards;
-}
+.msg-in { animation: msg-in 0.18s ease forwards; }
 
-/* ── Opening badge pulse ── */
+/* ── Follow-up chip entrance ── */
+@keyframes chip-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.chip-in { animation: chip-in 0.2s ease forwards; }
+
+/* ── Badge entrance ── */
 @keyframes badge-in {
   from { opacity: 0; transform: scale(0.92); }
   to   { opacity: 1; transform: scale(1); }
 }
-.badge-in {
-  animation: badge-in 0.25s ease forwards;
+.badge-in { animation: badge-in 0.25s ease forwards; }
+
+/* ── GM avatar pulse when response arrives ── */
+@keyframes avatar-pulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.18); }
+  100% { transform: scale(1); }
 }
+.avatar-pulse { animation: avatar-pulse 0.35s ease; }
+
+/* ── Analysis-ready ring on board ── */
+@keyframes analysis-ready {
+  0%   { box-shadow: 0 0 0 0px rgba(63, 200, 122, 0.5); }
+  50%  { box-shadow: 0 0 0 4px rgba(63, 200, 122, 0.2); }
+  100% { box-shadow: 0 0 0 0px rgba(63, 200, 122, 0); }
+}
+.analysis-ready { animation: analysis-ready 0.7s ease forwards; }
+
+/* ── Send button confirm ── */
+@keyframes send-confirm {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+.send-confirm { animation: send-confirm 0.4s ease; }
 
 /* ── Smooth eval bar transition ── */
 .eval-fill {
-  transition: height 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-              width  0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: height 0.75s cubic-bezier(0.4, 0, 0.2, 1),
+              width  0.75s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Engine line card hover ── */
+.engine-card:hover { background: var(--c-hover) !important; }
+
+/* ── iPhone 16 Pro specific: min touch targets ── */
+@media (max-width: 430px) {
+  .btn { min-height: 40px; }
+  .panel { border-radius: 0.75rem; }
 }
