@@ -117,7 +117,7 @@ interface MoveButtonProps {
   index: number;
   currentIndex: number;
   onNavigate: (index: number) => void;
-  activeRef?: React.RefObject<HTMLButtonElement | null>;
+  activeRef?: React.Ref<HTMLButtonElement>;
 }
 
 const MoveButton: React.FC<MoveButtonProps> = ({ san, index, currentIndex, onNavigate, activeRef }) => {
