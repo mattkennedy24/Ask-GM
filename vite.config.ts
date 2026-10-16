@@ -41,18 +41,19 @@ function stockfishEngine(): Plugin {
   };
 }
 
+// The Express API runs separately in development; Vite forwards /api to it (dev server and `vite preview`).
+const apiProxy = {
+  "/api": {
+    target: "http://localhost:3001",
+    changeOrigin: true,
+  },
+};
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), stockfishEngine()],
-  server: {
-    // Proxy /api requests to the Express backend during development
-    proxy: {
-      "/api": {
-        target: "http://localhost:3001",
-        changeOrigin: true,
-      },
-    },
-  },
+  server: { proxy: apiProxy },
+  preview: { proxy: apiProxy },
   test: {
     environment: "node",
     include: ["src/**/*.test.ts", "server/**/*.test.js"],
