@@ -1,91 +1,117 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import type { UnlockResult } from "../hooks/useBetaGate";
+import { Lock } from "./icons";
 
 interface BetaKeyModalProps {
-  onSubmit: (key: string) => void;
+  /** Asks the server to verify the code; resolves with the outcome. */
+  onUnlock: (code: string) => Promise<UnlockResult>;
 }
 
-const BetaKeyModal: React.FC<BetaKeyModalProps> = ({ onSubmit }) => {
-  const [value, setValue] = useState("");
-  const [error, setError] = useState(false);
+/**
+ * Access-code prompt for the private beta. The code is checked by the server
+ * before this dialog goes away, and a wrong code says so.
+ */
+export default function BetaKeyModal({ onUnlock }: BetaKeyModalProps) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [reveal, setReveal] = useState(false);
+  const [shakeKey, setShakeKey] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const errorId = useId();
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = value.trim();
-    if (!trimmed) {
-      setError(true);
-      return;
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+
+    const result = await onUnlock(code);
+    // On success the gate closes and this component unmounts.
+    if (!result.ok) {
+      setError(result.error ?? "That access code isn't valid.");
+      setShakeKey((k) => k + 1);
+      setBusy(false);
+      inputRef.current?.focus();
+      inputRef.current?.select();
     }
-    onSubmit(trimmed);
-  };
+  }
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0, 0, 0, 0.85)", backdropFilter: "blur(4px)" }}
+      style={{ background: "rgba(0, 0, 0, 0.82)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
     >
       <div
-        className="panel w-full max-w-sm p-6 flex flex-col gap-5"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        className="panel flex w-full max-w-sm flex-col gap-5 p-6"
         style={{ boxShadow: "0 24px 64px rgba(0,0,0,0.8)" }}
       >
-        {/* Header */}
-        <div className="text-center">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <span
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full"
+            style={{ background: "var(--c-gold-dim)", color: "var(--c-gold-bright)" }}
+          >
+            <Lock size={18} />
+          </span>
           <h2
-            className="text-2xl mb-1"
-            style={{
-              fontFamily: "var(--f-serif)",
-              fontWeight: 600,
-              color: "var(--c-gold-bright)",
-              letterSpacing: "-0.01em",
-            }}
+            id={titleId}
+            className="text-2xl"
+            style={{ fontFamily: "var(--f-serif)", fontWeight: 600, color: "var(--c-gold-bright)", letterSpacing: "-0.01em" }}
           >
             Ask <em style={{ fontStyle: "italic", color: "var(--c-text)" }}>GM</em>
           </h2>
-          <p className="text-sm" style={{ color: "var(--c-text-muted)" }}>
-            Enter your beta access code to continue
+          <p id={descriptionId} className="text-sm" style={{ color: "var(--c-text-soft)" }}>
+            This is a private beta. Enter your access code to talk to the grandmasters.
           </p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <input
-            ref={inputRef}
-            type="password"
-            value={value}
-            onChange={(e) => { setValue(e.target.value); setError(false); }}
-            placeholder="Access code"
-            autoComplete="off"
-            className="w-full text-sm px-4 py-3 rounded-lg focus:outline-none transition-colors text-center tracking-widest"
-            style={{
-              background: "var(--c-raised)",
-              border: `1px solid ${error ? "var(--c-gm-bobby)" : "var(--c-border-bright)"}`,
-              color: "var(--c-text)",
-              fontFamily: "var(--f-mono)",
-              letterSpacing: "0.2em",
-            }}
-            onFocus={(e) => {
-              if (!error) e.currentTarget.style.borderColor = "var(--c-gold)";
-            }}
-            onBlur={(e) => {
-              if (!error) e.currentTarget.style.borderColor = "var(--c-border-bright)";
-            }}
-          />
-          {error && (
-            <p className="text-xs text-center" style={{ color: "var(--c-gm-bobby)" }}>
-              Please enter an access code
-            </p>
-          )}
-          <button type="submit" className="btn-primary w-full py-2.5 text-sm">
-            Enter
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3" noValidate>
+          <div key={shakeKey} className={shakeKey > 0 ? "shake" : undefined}>
+            <input
+              ref={inputRef}
+              type={reveal ? "text" : "password"}
+              value={code}
+              onChange={(event) => {
+                setCode(event.target.value);
+                if (error) setError(null);
+              }}
+              placeholder="Access code"
+              aria-label="Access code"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="go"
+              disabled={busy}
+              className="field text-center"
+              style={{ fontFamily: "var(--f-mono)", letterSpacing: reveal ? "0.05em" : "0.2em", ["--gm" as string]: "var(--c-gold)" }}
+            />
+          </div>
+
+          <p id={errorId} role="alert" className="min-h-5 text-center text-sm" style={{ color: "var(--c-danger)" }}>
+            {error}
+          </p>
+
+          <button type="submit" disabled={busy || code.trim() === ""} className="btn btn-primary w-full" style={{ minHeight: "2.75rem" }}>
+            {busy ? "Checking…" : "Enter"}
+          </button>
+          <button type="button" onClick={() => setReveal((r) => !r)} className="text-xs underline-offset-2 hover:underline" style={{ color: "var(--c-text-muted)" }}>
+            {reveal ? "Hide code" : "Show code"}
           </button>
         </form>
       </div>
     </div>
   );
-};
-
-export default BetaKeyModal;
+}
