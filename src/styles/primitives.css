@@ -167,7 +167,9 @@
     /* 16px: anything smaller makes iOS Safari zoom the page when the field is focused. */
     font: var(--type-body);
   }
+  /* The border is 1px and the ring another 1px: a clear two-pixel edge without a heavy double line. */
   .field:focus-visible {
+    outline-width: 1px;
     outline-offset: 0;
   }
   .field::placeholder {

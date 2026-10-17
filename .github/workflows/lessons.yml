@@ -1,0 +1,27 @@
+name: Opening lessons
+
+# The opening lessons are checked against Stockfish whenever they change (or on demand): a lesson must
+# not teach a blunder. It is kept out of the main CI because it takes a minute and only matters for this file.
+on:
+  push:
+    paths:
+      - src/data/openings.ts
+      - scripts/verify-openings.mjs
+  pull_request:
+    paths:
+      - src/data/openings.ts
+      - scripts/verify-openings.mjs
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Stockfish check of every lesson line
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:openings

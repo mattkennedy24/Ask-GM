@@ -232,3 +232,26 @@ describe("one layout query", () => {
     }
   });
 });
+
+describe("brand colours outside the stylesheets", () => {
+  const token = (name: string) => tokens.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{6})`))?.[1].toLowerCase();
+  const root = (relative: string) => read(new URL(`../../${relative}`, import.meta.url));
+
+  it("paints the page, the browser bar and the installed app in the paper colour", () => {
+    const html = root("index.html");
+    expect(html.match(/name="theme-color" content="(#[0-9a-fA-F]{6})"/)?.[1].toLowerCase()).toBe(token("paper"));
+    expect(html.match(/html\s*\{\s*background:\s*(#[0-9a-fA-F]{6})/)?.[1].toLowerCase()).toBe(token("paper"));
+    const manifest = JSON.parse(root("public/site.webmanifest"));
+    expect(manifest.background_color.toLowerCase()).toBe(token("paper"));
+    expect(manifest.theme_color.toLowerCase()).toBe(token("paper"));
+  });
+
+  it("draws the icons in ink and paper", () => {
+    const favicon = root("public/favicon.svg").toLowerCase();
+    expect(favicon).toContain(token("ink"));
+    expect(favicon).toContain(token("paper"));
+    const maker = root("scripts/make-icons.mjs").toLowerCase();
+    expect(maker).toContain(token("ink"));
+    expect(maker).toContain(token("paper"));
+  });
+});

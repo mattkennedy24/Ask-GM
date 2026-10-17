@@ -18,6 +18,7 @@
     "test:watch": "vitest",
     "check": "npm run lint && npm run typecheck && npm test",
     "verify:openings": "node scripts/verify-openings.mjs",
+    "verify:tactics": "node scripts/verify-tactics.mjs",
     "e2e": "playwright test",
     "preview": "vite preview",
     "start": "NODE_ENV=production node server/index.js"

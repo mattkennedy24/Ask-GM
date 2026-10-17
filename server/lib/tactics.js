@@ -36,29 +36,35 @@ function withOtherSideToMove(chess) {
  * exchange"). Works on a scratch board: each capture is made, the rest of the exchange is
  * evaluated, and the board is put back. Pieces that become attackers once the front piece
  * has left (x-rays and batteries) are found automatically because attackers are recomputed.
+ *
+ * A capture that would leave the capturer's own king in check (the piece is pinned, or moving it
+ * uncovers an attack) is not a capture at all, so the next cheapest piece is tried instead. A pawn
+ * capturing onto the last rank stands on the square as a queen, which is what gets recaptured.
  */
 function exchangeGain(chess, square, side) {
   const victim = chess.get(square);
   if (!victim || victim.type === "k") return 0;
 
+  const other = opposite(side);
   const attackers = chess
     .attackers(square, side)
     .map((from) => ({ from, piece: chess.get(from) }))
     .sort((a, b) => VALUE[a.piece.type] - VALUE[b.piece.type] || a.from.localeCompare(b.from));
-  if (attackers.length === 0) return 0;
 
-  const { from, piece } = attackers[0];
-  const other = opposite(side);
-  chess.remove(from);
-  chess.put(piece, square);
+  for (const { from, piece } of attackers) {
+    const promotes = piece.type === "p" && (square[1] === "8" || square[1] === "1");
+    chess.remove(from);
+    chess.put(promotes ? { type: "q", color: side } : piece, square);
 
-  // A king may only capture when nothing is left to capture it back.
-  const legal = piece.type !== "k" || chess.attackers(square, other).length === 0;
-  const gain = legal ? Math.max(0, VALUE[victim.type] - exchangeGain(chess, square, other)) : 0;
+    const [kingSquare] = chess.findPiece({ type: "k", color: side });
+    const legal = kingSquare !== undefined && !chess.isAttacked(kingSquare, other);
+    const gain = legal ? Math.max(0, VALUE[victim.type] - exchangeGain(chess, square, other)) : 0;
 
-  chess.put(victim, square);
-  chess.put(piece, from);
-  return gain;
+    chess.put(victim, square);
+    chess.put(piece, from);
+    if (legal) return gain;
+  }
+  return 0;
 }
 
 /**

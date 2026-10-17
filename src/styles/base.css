@@ -37,6 +37,16 @@
   ul {
     margin: 0;
   }
+
+  /* Headlines break evenly; paragraphs avoid a stranded last word. (Ignored where unsupported.) */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
   ol,
   ul {
     padding: 0;

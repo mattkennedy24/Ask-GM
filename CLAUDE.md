@@ -18,6 +18,7 @@ npm run typecheck   # tsc -b
 npm run check       # lint + typecheck + tests
 npm run e2e         # Playwright: the real app in a real browser, on a laptop and an iPhone-sized screen
 npm run verify:openings   # Stockfish check of every opening lesson (about a minute)
+npm run verify:tactics    # the coach's computed capture facts vs a brute-force search (a few minutes)
 ```
 
 Run `npm run check` and `npm run build` before committing; run `npm run e2e` after changing anything a person can see or touch. **`npm run build` includes `tsc -b` under strict settings**: type errors fail the deploy even when `vite build` alone would pass. The tsconfig uses `erasableSyntaxOnly`, so no constructor parameter properties, enums or namespaces.

@@ -156,3 +156,67 @@ describe("getTacticalFacts", () => {
     expect(getTacticalFacts(START_FEN)).toEqual([]);
   });
 });
+
+describe("getPieceSafety against a brute-force search", () => {
+  // The facts handed to the coach must be right, so the static exchange is checked against an independent
+  // search that plays out every capture on the square with real legal moves (pins and discovered checks included).
+  const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+  function bestExchange(chess, square, depth = 0) {
+    // Nothing can capture here at all: no need to generate every legal move to find out.
+    if (depth > 12 || chess.attackers(square, chess.turn()).length === 0) return 0;
+    let best = 0;
+    for (const move of chess.moves({ verbose: true })) {
+      if (move.to !== square || !move.captured || move.flags.includes("e")) continue;
+      chess.move(move);
+      best = Math.max(best, VALUE[move.captured] - bestExchange(chess, square, depth + 1));
+      chess.undo();
+    }
+    return best;
+  }
+
+  it("makes (almost) no claim that a real search refutes, and misses almost nothing it could have listed", { timeout: 60_000 }, () => {
+    let seed = 20240607;
+    const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
+
+    let claims = 0;
+    let wrong = 0;
+    let findable = 0;
+    let missed = 0;
+    for (let n = 0; n < 70; n++) {
+      const chess = new Chess();
+      const plies = 8 + Math.floor(random() * 60);
+      for (let i = 0; i < plies; i++) {
+        const moves = chess.moves();
+        if (moves.length === 0) break;
+        chess.move(moves[Math.floor(random() * moves.length)]);
+      }
+      if (chess.isGameOver()) continue;
+
+      const truth = new Set();
+      for (const row of chess.board()) {
+        for (const piece of row) {
+          if (piece && piece.color !== chess.turn() && piece.type !== "k" && bestExchange(chess, piece.square) > 0) truth.add(piece.square);
+        }
+      }
+
+      const { opportunities } = getPieceSafety(chess.fen());
+      const claimed = new Set(opportunities.map((text) => /on ([a-h][1-8])/.exec(text)[1]));
+      for (const square of claimed) {
+        claims++;
+        if (!truth.has(square)) wrong++;
+      }
+      if (opportunities.length < 4) {
+        for (const square of truth) {
+          findable++;
+          if (!claimed.has(square)) missed++;
+        }
+      }
+    }
+
+    // A small, fixed sample keeps this quick; `npm run verify:tactics` runs thousands.
+    expect(claims).toBeGreaterThan(50);
+    expect(wrong / claims).toBeLessThan(0.02);
+    expect(missed / findable).toBeLessThan(0.03);
+  });
+});

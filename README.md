@@ -63,8 +63,9 @@ Set these in `.env` locally, or as service variables on your host. Never commit 
 | `npm run typecheck` | `tsc -b` |
 | `npm run check` | lint + typecheck + tests — run before committing |
 | `npm run verify:openings` | Runs Stockfish over every opening lesson and fails on a line that teaches a blunder |
+| `npm run verify:tactics` | Checks the "what can be won" facts given to the coach against a brute-force search on thousands of random positions |
 
-The first `npm run e2e` needs a browser: `npx playwright install chromium`.
+The first `npm run e2e` needs a browser: `npx playwright install chromium`. GitHub Actions runs `check`, `build` and `e2e` on every push and pull request (`.github/workflows/`), and the Stockfish lesson check whenever `src/data/openings.ts` changes.
 
 ## How it works
 
