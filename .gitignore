@@ -29,3 +29,6 @@ dist-ssr
 # Playwright
 test-results/
 playwright-report/
+
+# Claude Code: local session notes, kept out of git (see .claude/session-log/README.md)
+.claude/session-log/

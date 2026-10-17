@@ -65,3 +65,8 @@ Needs `ANTHROPIC_API_KEY` in `.env` for real chat (`cp .env.example .env`). Test
 - Anything unrelated to chess gets a short, funny, in-character dismissal.
 - Target devices: recent iPhones (iPhone 16 Pro, 393px) and laptops.
 - Deferred on purpose and tracked as issues: restricting CORS (#17) and Helmet/CSP (#18). Don't add them as part of unrelated work.
+
+## Continuity: notes and skills
+
+- **`.claude/session-log/`** is a git-ignored notebook, so a fresh clone will not have it. If it exists, read `standing-context.md` (the owner's preferences, decisions to keep, open items, environment gotchas) and the newest dated log before starting. When something durable changes, update `standing-context.md`; at the end of a session or milestone add a dated entry. Its `README.md` has the template and the rules (brief, no secrets, say what was not verified).
+- **Project skills** live in `.claude/skills/` and are committed. `/dev` builds and runs the app locally in development (`/dev prod` serves the Railway-style build on one port, which is how to try it on a phone). A brand-new `.claude/skills/` folder is only picked up mid-session after `/reload-skills`.
