@@ -101,7 +101,7 @@
     min-height: 2.75rem;
     padding: 0 0.75rem;
     border: 0;
-    border-radius: calc(var(--radius-tile) - 4px);
+    border-radius: var(--radius-small);
     background: transparent;
     color: var(--color-ink);
     text-align: left;
@@ -466,8 +466,40 @@
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
+    min-height: 3rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--color-rule);
+  }
+
+  .review-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .review-progress {
+    position: relative;
+    height: 2px;
+    background: var(--color-rule);
+  }
+  .review-progress::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: var(--done);
+    background: var(--color-ink);
+    transition: width var(--dur-base) var(--ease-out);
+  }
+  .review-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.5rem;
     padding: 0.625rem 1rem;
     border-bottom: 1px solid var(--color-rule);
+  }
+  .review-summary p {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
   }
 
   .moves {
@@ -498,7 +530,7 @@
     min-height: 1.75rem;
     padding: 0 0.5rem;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-small);
     background: transparent;
     color: var(--color-ink-2);
     font: var(--type-small);
@@ -576,7 +608,7 @@
   }
   .engine-san {
     padding: 0 0.5rem;
-    border-radius: 4px;
+    border-radius: var(--radius-small);
     background: var(--color-paper-2);
   }
   .engine-line[aria-pressed="true"] .engine-san {
@@ -595,7 +627,7 @@
   }
   .engine-step {
     padding: 0 0.25rem;
-    border-radius: 4px;
+    border-radius: var(--radius-small);
   }
   .engine-empty {
     padding: 1rem;
@@ -700,7 +732,7 @@
     display: inline;
     padding: 0 0.25em;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-small);
     background: color-mix(in srgb, var(--color-marker) 70%, transparent);
     color: var(--color-ink);
     /* The sans runs larger than the serif around it, so it is eased down a little (em, not a new size). */
@@ -899,61 +931,60 @@
   }
 }
 
-/* ══ From the phone up to the laptop ═══════════════════════════════════ */
+/* ══ From the phone up to the laptop ═══════════════════════════════════
+   The laptop query is written out in full: it must match DESKTOP_QUERY in src/lib/layout.ts and the `desk`
+   variant in src/index.css, and Tailwind's `@variant desk` keeps only the first condition of a query list
+   when it is used inside a rule (a phone on its side would silently fall back to the phone styles). */
 @layer components {
-  .board-frame {
-    @variant desk {
+  @media (min-width: 1024px), (orientation: landscape) and (min-width: 700px) {
+    .board-frame {
       flex: none;
       width: var(--board-size);
       border: 2px solid var(--color-ink);
     }
-  }
-  .board-stage {
-    @variant desk {
+    .board-stage {
       padding: 0.75rem 1rem 0;
     }
-  }
-  .captures {
-    @variant desk {
+    .captures {
       padding-inline: 1.5rem 0;
     }
-  }
-  .quick-asks {
-    @variant desk {
+    .quick-asks {
       flex-wrap: wrap;
       overflow-x: visible;
     }
-  }
-  .result {
-    @variant desk {
+    .result {
       flex-direction: row;
       justify-content: space-between;
       text-align: left;
     }
-  }
-  .result-text {
-    @variant desk {
+    .result-text {
       align-items: flex-start;
     }
-  }
-  .eval-bar-vertical {
-    @variant desk {
+    .eval-bar-vertical {
       min-height: 0;
     }
-  }
-  .brief,
-  .controls,
-  .feedback {
-    @variant desk {
+    .brief,
+    .controls,
+    .feedback,
+    .lesson-bar,
+    .learn-head,
+    .search,
+    .chips {
       padding-inline: 1.25rem;
     }
   }
-  .lesson-bar,
-  .learn-head,
-  .search,
-  .chips {
-    @variant desk {
-      padding-inline: 1.25rem;
+
+  /* A phone on its side: very little height to spare. */
+  @media (max-height: 520px) {
+    .captures {
+      display: none;
+    }
+    .brief {
+      min-height: 2.5rem;
+      padding-block: 0.5rem;
+    }
+    .controls {
+      padding-block: 0.5rem;
     }
   }
 }

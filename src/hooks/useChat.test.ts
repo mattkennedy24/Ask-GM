@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHistory, type ChatMessage } from "./useChat";
+import { buildHistory, type ChatMessage, removeFailedExchange } from "./useChat";
 
 const msg = (id: number, role: "user" | "gm", ply: number, extra: Partial<ChatMessage> = {}): ChatMessage => ({
   id: String(id),
@@ -52,5 +52,33 @@ describe("buildHistory", () => {
     expect(buildHistory(messages, 4, "game-2").map((m) => m.content)).toEqual(["user 3"]);
     expect(buildHistory(messages, 4, "lesson-C60").map((m) => m.content)).toEqual(["gm 4"]);
     expect(buildHistory(messages, 4, "game-1").map((m) => m.content)).toEqual(["user 1", "gm 2"]);
+  });
+});
+
+describe("removeFailedExchange", () => {
+  it("takes the failed question and its error out, so asking again does not duplicate the question", () => {
+    const thread = [msg(1, "gm", 0, { kind: "welcome" }), msg(2, "user", 3, { text: "hello?" }), msg(3, "gm", 3, { kind: "error", text: "Can't reach the server.", retry: "hello?" })];
+    expect(removeFailedExchange(thread, "3").map((m) => m.id)).toEqual(["1"]);
+  });
+
+  it("leaves other messages alone, including an identical question asked earlier", () => {
+    const thread = [
+      msg(1, "user", 2, { text: "best move?" }),
+      msg(2, "gm", 2),
+      msg(3, "user", 4, { text: "best move?" }),
+      msg(4, "gm", 4, { kind: "error", retry: "best move?" }),
+      msg(5, "gm", 4, { kind: "note" }),
+    ];
+    expect(removeFailedExchange(thread, "4").map((m) => m.id)).toEqual(["1", "2", "5"]);
+  });
+
+  it("only drops the error when the message before it is not the retried question", () => {
+    const thread = [msg(1, "gm", 2), msg(2, "gm", 2, { kind: "error", retry: "why?" })];
+    expect(removeFailedExchange(thread, "2").map((m) => m.id)).toEqual(["1"]);
+  });
+
+  it("does nothing for an unknown id", () => {
+    const thread = [msg(1, "user", 1), msg(2, "gm", 1)];
+    expect(removeFailedExchange(thread, "nope")).toEqual(thread);
   });
 });

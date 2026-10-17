@@ -21,11 +21,20 @@ export default function Dialog({ kicker, title, description, onClose, children, 
   const descriptionId = useId();
   const panel = useRef<HTMLDivElement>(null);
 
+  const open = useRef(false);
   useEffect(() => {
     const before = document.activeElement as HTMLElement | null;
+    open.current = true;
     const target = initialFocus?.current ?? panel.current?.querySelector<HTMLElement>("input, textarea, button");
     target?.focus();
-    return () => before?.focus?.();
+    return () => {
+      open.current = false;
+      // Wait a tick: the page behind a dialog is inert while it is open, and only becomes focusable again after
+      // this cleanup. (If the dialog is merely being re-mounted, it is open again by then and nothing moves.)
+      setTimeout(() => {
+        if (!open.current) before?.focus?.();
+      }, 0);
+    };
   }, [initialFocus]);
 
   useEffect(() => {

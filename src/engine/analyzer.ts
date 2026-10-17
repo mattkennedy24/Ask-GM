@@ -126,6 +126,11 @@ export class UciAnalyzer {
     // "starting": picked up on readyok. "stopping": picked up when the old bestmove arrives.
   }
 
+  /** Stop whatever is running or queued, without publishing anything for it. */
+  cancel(): void {
+    this.cancelCurrent();
+  }
+
   dispose(): void {
     if (this.phase === "disposed") return;
     this.phase = "disposed";

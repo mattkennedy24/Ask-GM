@@ -104,6 +104,10 @@
   .btn-quiet {
     border-color: transparent;
   }
+  .btn-compact {
+    min-height: 2rem;
+    padding: 0 0.75rem;
+  }
 
   /* ── Chips: suggestions and filters ───────────────────────────────── */
   .chip {
@@ -349,6 +353,9 @@
     }
     .btn-icon {
       width: 2.75rem;
+    }
+    .btn.btn-compact {
+      min-height: 2.25rem;
     }
     .chip {
       min-height: 2.5rem;

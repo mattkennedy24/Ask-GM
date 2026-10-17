@@ -8,7 +8,7 @@ import {
   getKingSafety,
   getMaterialBalance,
 } from "./chessContext.js";
-import { describeMoveReview } from "./moveReview.js";
+import { describeGameReview, describeMoveReview } from "./moveReview.js";
 import { getTacticalFacts } from "./tactics.js";
 
 const MAX_LISTED_LEGAL_MOVES = 40;
@@ -19,7 +19,7 @@ function formatMoveHistory(moves) {
     .trim();
 }
 
-function positionSection({ chess, fen, moveHistory, openingName, moveReview }) {
+function positionSection({ chess, fen, moveHistory, openingName, moveReview, gameReview }) {
   const sideToMove = chess.turn() === "w" ? "White" : "Black";
   const result = describeGameResult(fen);
   const lines = [
@@ -51,6 +51,8 @@ function positionSection({ chess, fen, moveHistory, openingName, moveReview }) {
 
   const review = describeMoveReview({ fen, moveHistory, review: moveReview });
   if (review) lines.push(`• LAST MOVE REVIEW (from the engine): ${review}`);
+  const whole = describeGameReview({ moveHistory, flagged: gameReview });
+  if (whole) lines.push(`• GAME REVIEW (the engine's verdict on the costliest moves so far): ${whole.text}.`);
   return lines.join("\n");
 }
 
@@ -96,6 +98,7 @@ function guidelinesSection({ gm, lengthHint }) {
     "- The POSITION FACTS are computed by software and are reliable. Never contradict them, and never claim a piece is hanging, pinned, attacked or defended unless the facts or the engine lines support it.",
     "- When you say why a move works, connect it to the position (material, king safety, pawn structure, piece activity).",
     "- If a LAST MOVE REVIEW is present and the student asks about their last move or what went wrong, build your answer on it and stay consistent with it.",
+    "- If a GAME REVIEW is present and the student asks about their mistakes, the turning points or what to work on, build your answer on it. It is computed, so do not contradict it or invent other mistakes.",
     "- Earlier messages in this conversation may be about a different position. The current position above is authoritative.",
     "",
     "SCOPE & SAFETY:",
@@ -114,12 +117,12 @@ function guidelinesSection({ gm, lengthHint }) {
  * Persona + grounded position context + response rules.
  * `gm` is an entry from gmPersonalities; all other inputs must already be sanitised.
  */
-export function buildSystemPrompt({ gm, fen, moveHistory = [], topLines = [], openingName = "", moveReview = null, lengthHint }) {
+export function buildSystemPrompt({ gm, fen, moveHistory = [], topLines = [], openingName = "", moveReview = null, gameReview = [], lengthHint }) {
   const chess = new Chess(fen);
   return [
     gm.systemPrompt,
     "",
-    positionSection({ chess, fen, moveHistory, openingName, moveReview }),
+    positionSection({ chess, fen, moveHistory, openingName, moveReview, gameReview }),
     "",
     engineSection({ fen, topLines }),
     "",

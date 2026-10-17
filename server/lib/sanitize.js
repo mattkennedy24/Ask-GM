@@ -19,6 +19,7 @@ export const LIMITS = Object.freeze({
   pvMoves: 12,
   openingName: 80,
   fen: 100,
+  reviewedMoves: 12,
 });
 
 // C0/C1 control characters (keeping tab, newline and carriage return), DEL, soft hyphen, and the
@@ -144,6 +145,31 @@ export function sanitizeMoveReview(value) {
   };
 }
 
+const FLAGGED_QUALITIES = ["inaccuracy", "mistake", "blunder"];
+
+/**
+ * The costliest mistakes of the game so far, as judged by the browser's engine. Like a single move
+ * review, only fixed words and bounded numbers get through; moveReview.js re-checks every entry
+ * against the move list before a sentence is written.
+ */
+export function sanitizeGameReview(value) {
+  if (!Array.isArray(value)) return [];
+  const flagged = [];
+  for (const raw of value.slice(0, LIMITS.reviewedMoves)) {
+    if (!raw || typeof raw !== "object") continue;
+    // A ply outside the game is not "clamped into" one: the entry is simply wrong, so it is dropped.
+    if (!Number.isInteger(raw.ply) || raw.ply < 1 || raw.ply > LIMITS.moveHistory) continue;
+    if (typeof raw.quality !== "string" || !FLAGGED_QUALITIES.includes(raw.quality)) continue;
+    flagged.push({
+      ply: raw.ply,
+      quality: raw.quality,
+      lossCp: intOrNull(raw.lossCp, 0, 100000) ?? 0,
+      bestMove: typeof raw.bestMove === "string" && UCI_RE.test(raw.bestMove) ? raw.bestMove : null,
+    });
+  }
+  return flagged;
+}
+
 function normalizeRole(role) {
   if (role === "user" || role === "You") return "user";
   if (role === "assistant" || role === "GM") return "assistant";
@@ -210,6 +236,7 @@ export function validateChatPayload(body, isKnownGM) {
       topLines: sanitizeTopLines(body.topLines),
       openingName: sanitizeOpeningName(body.openingName),
       moveReview: sanitizeMoveReview(body.moveReview),
+      gameReview: sanitizeGameReview(body.gameReview),
     },
   };
 }

@@ -5,7 +5,7 @@
    • Type: only the roles in components.css (type-display … type-label). No other font sizes.
    • Colour: only the tokens below. No hex or rgb() values in components.
    • Flat: no shadows, blurs or gradients. Depth comes from rules (borders) and paper tones.
-   • Shape: two radii only — a tile (8px) and a pill.
+   • Shape: a tile (8px), a small chip (4px) and a pill. Nothing else.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* `static` keeps every token in the output even when only CSS (not a utility class) uses it. */
@@ -50,6 +50,7 @@
   /* ── Shape ───────────────────────────────────────────────────────── */
   --radius-*: initial;
   --radius-tile: 8px;
+  --radius-small: 4px;
   --radius-pill: 999px;
 
   /* ── Flat: these utilities do not exist ───────────────────────────── */
@@ -89,9 +90,6 @@
 
   /* Coordinates in the corners of the squares: board artwork, so they get their own small size. */
   --fs-coord: 0.625rem;
-  @variant desk {
-    --fs-coord: 0.75rem;
-  }
 
   /* Motion */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -105,6 +103,22 @@
 
   /* Board edge on laptops: as tall as the window allows, within sensible bounds. */
   --board-size: clamp(300px, calc(100dvh - 19rem), 40rem);
+}
+
+/* Laptops, and phones or tablets on their side. Written out in full (and kept in step with DESKTOP_QUERY in
+   src/lib/layout.ts and the `desk` variant in src/index.css) because Tailwind's `@variant desk` keeps only the
+   first condition of a query list when it is used inside a rule. */
+@media (min-width: 1024px), (orientation: landscape) and (min-width: 700px) {
+  :root {
+    --fs-coord: 0.75rem;
+  }
+}
+
+/* A phone on its side has almost no height: the board takes what is left once the chrome is slimmed down. */
+@media (max-height: 520px) {
+  :root {
+    --board-size: clamp(160px, calc(100dvh - 11.5rem), 40rem);
+  }
 }
 
 [data-gm="Magnus"] {

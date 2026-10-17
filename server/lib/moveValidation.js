@@ -65,7 +65,7 @@ function addRecentPastMoveKeys(fen, moveHistory, keys) {
 }
 
 /** Every move key that may legitimately be mentioned for this position and analysis. */
-export function collectAllowedMoveKeys({ fen, topLines = [], moveHistory = [] }) {
+export function collectAllowedMoveKeys({ fen, topLines = [], moveHistory = [], extraKeys = [] }) {
   const keys = new Set();
 
   let root;
@@ -89,6 +89,7 @@ export function collectAllowedMoveKeys({ fen, topLines = [], moveHistory = [] })
   }
 
   for (const san of moveHistory) keys.add(moveKey(san));
+  for (const key of extraKeys) keys.add(key);
   addRecentPastMoveKeys(fen, moveHistory, keys);
   return keys;
 }

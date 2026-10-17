@@ -41,6 +41,34 @@ function stockfishEngine(): Plugin {
   };
 }
 
+/**
+ * Preload the fonts the first screen needs. Without this the browser only finds out about them after it has
+ * parsed the stylesheet, and the text flashes in a fallback face before the real one arrives.
+ */
+function preloadFonts(): Plugin {
+  let base = "/";
+  const needed = [/newsreader-latin-wght-normal/, /newsreader-latin-wght-italic/, /libre-franklin-latin-wght-normal/];
+  return {
+    name: "ask-gm:preload-fonts",
+    configResolved(config) {
+      base = config.base;
+    },
+    transformIndexHtml: {
+      order: "post",
+      handler(_html, context) {
+        if (!context.bundle) return undefined; // dev server: fonts are served on demand
+        return Object.keys(context.bundle)
+          .filter((file) => needed.some((pattern) => pattern.test(file)))
+          .map((file) => ({
+            tag: "link",
+            attrs: { rel: "preload", as: "font", type: "font/woff2", crossorigin: "", href: `${base}${file}` },
+            injectTo: "head" as const,
+          }));
+      },
+    },
+  };
+}
+
 // The Express API runs separately in development; Vite forwards /api to it (dev server and `vite preview`).
 const apiProxy = {
   "/api": {
@@ -51,7 +79,7 @@ const apiProxy = {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), stockfishEngine()],
+  plugins: [react(), tailwindcss(), stockfishEngine(), preloadFonts()],
   server: { proxy: apiProxy },
   preview: { proxy: apiProxy },
   test: {

@@ -7,11 +7,16 @@ const NAMES: Record<CapturableType, string> = { q: "queen", r: "rook", b: "bisho
 
 interface CapturedPiecesProps {
   fen: string;
+  /**
+   * Whether the pieces that are missing were really captured. That is only true when the game began from the
+   * starting position; a position pasted from a FEN just has fewer pieces, so only the material lead is shown.
+   */
+  known: boolean;
   /** The board is flipped: Black's captures go on the left, nearest the player at the bottom. */
   flipped: boolean;
 }
 
-function Side({ fen, capturedBy }: { fen: string; capturedBy: "w" | "b" }) {
+function Side({ fen, capturedBy, known }: { fen: string; capturedBy: "w" | "b"; known: boolean }) {
   const { pieces, lead } = useMemo(() => {
     const summary = summarizeMaterial(fen);
     const mine = capturedBy === "w" ? summary.capturedByWhite : summary.capturedByBlack;
@@ -22,7 +27,13 @@ function Side({ fen, capturedBy }: { fen: string; capturedBy: "w" | "b" }) {
   // The figurine is drawn in the colour of the piece that was taken, not of the side that took it.
   const taken = capturedBy === "w" ? "b" : "w";
   const side = capturedBy === "w" ? "White" : "Black";
-  const description = pieces.length > 0 ? `${side} has captured: ${pieces.map((p) => NAMES[p]).join(", ")}` : `${side} has captured nothing`;
+  const description = !known
+    ? lead > 0
+      ? `${side} is ahead by ${lead}`
+      : side
+    : pieces.length > 0
+      ? `${side} has captured: ${pieces.map((p) => NAMES[p]).join(", ")}`
+      : `${side} has captured nothing`;
 
   return (
     <div className="captured" role="img" aria-label={description}>
@@ -30,7 +41,7 @@ function Side({ fen, capturedBy }: { fen: string; capturedBy: "w" | "b" }) {
         {side}
       </span>
       <span className="captured-pieces" aria-hidden="true">
-        {pieces.map((type, i) => (
+        {(known ? pieces : []).map((type, i) => (
           <PieceIcon key={i} piece={`${taken}${type.toUpperCase()}` as PieceCode} className="captured-piece" />
         ))}
       </span>
@@ -44,11 +55,11 @@ function Side({ fen, capturedBy }: { fen: string; capturedBy: "w" | "b" }) {
 }
 
 /** What each side has taken, in one row under the board. */
-export default function CapturedPieces({ fen, flipped }: CapturedPiecesProps) {
+export default function CapturedPieces({ fen, known, flipped }: CapturedPiecesProps) {
   return (
     <div className="captures">
-      <Side fen={fen} capturedBy={flipped ? "b" : "w"} />
-      <Side fen={fen} capturedBy={flipped ? "w" : "b"} />
+      <Side fen={fen} known={known} capturedBy={flipped ? "b" : "w"} />
+      <Side fen={fen} known={known} capturedBy={flipped ? "w" : "b"} />
     </div>
   );
 }

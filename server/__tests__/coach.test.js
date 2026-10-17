@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Chess } from "chess.js";
 import { createCoach, EmptyResponseError } from "../lib/coach.js";
 import gmPersonalities from "../gmPersonalities.js";
 
@@ -79,6 +80,26 @@ describe("createCoach.ask", () => {
     await coach.ask(input({ fen, question: "Was my move bad?", moveHistory: ["f3"], moveReview: { quality: "mistake", lossCp: 183, bestMove: "e2e4" } }));
     expect(create).toHaveBeenCalledTimes(1); // no corrective retry
     expect(create.mock.calls[0][0].system).toContain("LAST MOVE REVIEW (from the engine): White's last move, 1.f3, was a mistake");
+  });
+
+  it("lets the coach quote what the engine preferred many moves ago, without a corrective retry", async () => {
+    // 1.d4 d5 2.c4 e6 3.Nc3 Nf6 4.Bg5 Be7 5.e3 O-O 6.Nf3 h6 7.Bh4 b6 8.cxd5 Nxd5 9.Bxe7 Qxe7 10.Nxd5 exd5.
+    // At move 1 the engine "preferred" 1.e4; that move is long gone, but it is a fair thing to quote.
+    const history = ["d4", "d5", "c4", "e6", "Nc3", "Nf6", "Bg5", "Be7", "e3", "O-O", "Nf3", "h6", "Bh4", "b6", "cxd5", "Nxd5", "Bxe7", "Qxe7", "Nxd5", "exd5"];
+    const board = new Chess();
+    for (const san of history) board.move(san);
+    const { coach, create } = makeCoach(reply("Back at move 1 the engine liked e4 better.\nFOLLOWUPS: A idea | B idea | C idea"));
+    await coach.ask(
+      input({
+        fen: board.fen(),
+        topLines: [],
+        moveHistory: history,
+        question: "What were my biggest mistakes?",
+        gameReview: [{ ply: 1, quality: "inaccuracy", lossCp: 60, bestMove: "e2e4" }],
+      }),
+    );
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0][0].system).toContain("1.d4 (inaccuracy, gave up about 0.6 pawns; the engine preferred 1.e4)");
   });
 
   it("tells the model the game is over instead of pretending the engine is still thinking", async () => {

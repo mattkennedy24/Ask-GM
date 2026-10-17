@@ -81,6 +81,8 @@ export default function Menu({ items, label }: MenuProps) {
                 disabled={item.disabled}
                 onClick={() => {
                   setOpen(false);
+                  // Focus goes back to the button first, so a dialog this opens remembers it and returns here.
+                  trigger.current?.focus();
                   item.onSelect();
                 }}
               >

@@ -22,6 +22,8 @@ interface BoardPanelProps {
   thinking: boolean;
   /** Set once the game is over; replaces the evaluation. */
   outcome: GameOutcome | null;
+  /** Whether missing pieces were captured in this game (false for a position pasted from a FEN). */
+  capturesKnown: boolean;
 
   canBack: boolean;
   canForward: boolean;
@@ -54,6 +56,7 @@ export default function BoardPanel({
   mate,
   thinking,
   outcome,
+  capturesKnown,
   canBack,
   canForward,
   onBack,
@@ -106,7 +109,7 @@ export default function BoardPanel({
           <EvalBar whiteShare={share} label={label} orientation="horizontal" flipped={flipped} stale={stale} />
         </div>
 
-        <CapturedPieces fen={fen} flipped={flipped} />
+        <CapturedPieces fen={fen} known={capturesKnown} flipped={flipped} />
       </div>
 
       <div className="controls">

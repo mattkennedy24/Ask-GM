@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MULTI_PV, UciAnalyzer } from "../engine/analyzer";
 import { fetchCloudEval } from "../engine/lichess";
+import { createEngineWorker } from "../engine/worker";
 import type { EngineLine } from "../engine/uci";
 
 /**
@@ -17,10 +18,6 @@ export interface EngineState {
   thinking: boolean;
   status: EngineStatus;
 }
-
-// The engine files are copied from the `stockfish` package into /engine at build time (see vite.config.ts).
-const ENGINE_SCRIPT = `${import.meta.env.BASE_URL}engine/stockfish-16-single.js`;
-const ENGINE_WASM = `${import.meta.env.BASE_URL}engine/stockfish-16-single.wasm`;
 
 const INITIAL: EngineState = { fen: null, lines: [], thinking: false, status: "starting" };
 
@@ -61,7 +58,7 @@ export function useStockfish() {
     };
 
     try {
-      const worker = new Worker(`${ENGINE_SCRIPT}#${encodeURIComponent(ENGINE_WASM)}`);
+      const worker = createEngineWorker();
       analyzer = new UciAnalyzer(worker, {
         onReady: () => {
           if (!cancelled) setState((s) => ({ ...s, status: "ready" }));

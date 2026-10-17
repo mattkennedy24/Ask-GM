@@ -3,6 +3,7 @@ import type { EngineLine } from "../engine/uci";
 import { GM_NAMES, GMS, type GMName } from "../data/gms";
 import { ApiError, askGM } from "../lib/api";
 import type { MoveVerdict } from "../lib/moveReview";
+import type { ReviewedMove } from "../lib/reviewSummary";
 
 export interface ChatMessage {
   id: string;
@@ -34,6 +35,8 @@ export interface SendContext {
   openingName?: string;
   /** How the move that led to this position was judged, when the engine has looked deeply enough to say. */
   moveReview?: MoveVerdict | null;
+  /** The costliest mistakes of the game so far, once the engine has judged them. */
+  gameReview?: ReviewedMove[];
   /** Prepended to the question the model sees, but not shown in the chat (e.g. lesson context). */
   contextPrefix?: string;
 }
@@ -51,6 +54,19 @@ export function buildHistory(messages: readonly ChatMessage[], ply: number, scop
     .filter((m) => !m.kind && m.scope === scope && Math.abs(m.ply - ply) <= MAX_PLY_DISTANCE)
     .slice(-MAX_HISTORY_TURNS)
     .map((m) => ({ role: m.role === "user" ? ("user" as const) : ("assistant" as const), content: m.text }));
+}
+
+/**
+ * A failed question and its error message, taken out of the thread so that asking again does not show the same
+ * question twice. Only the question that directly precedes the error, and only if it is the one being retried.
+ */
+export function removeFailedExchange(messages: readonly ChatMessage[], errorId: string): ChatMessage[] {
+  const at = messages.findIndex((m) => m.id === errorId);
+  if (at < 0) return [...messages];
+  const failed = messages[at];
+  const question = messages[at - 1];
+  const dropQuestion = question?.role === "user" && !question.kind && question.text === failed.retry;
+  return messages.filter((_, i) => i !== at && !(dropQuestion && i === at - 1));
 }
 
 type Threads = Record<GMName, ChatMessage[]>;
@@ -113,6 +129,7 @@ export function useChat(options: { betaKey: string | null; onUnauthorized: () =>
             topLines: context.topLines,
             openingName: context.openingName,
             moveReview: context.moveReview ?? null,
+            gameReview: context.gameReview ?? [],
           },
           optionsRef.current.betaKey,
         );
@@ -141,7 +158,7 @@ export function useChat(options: { betaKey: string | null; onUnauthorized: () =>
     (gm: GMName, messageId: string, context: SendContext) => {
       const failed = threadsRef.current[gm].find((m) => m.id === messageId);
       if (!failed?.retry) return;
-      update(gm, (messages) => messages.filter((m) => m.id !== messageId));
+      update(gm, (messages) => removeFailedExchange(messages, messageId));
       void send(gm, failed.retry, context);
     },
     [send, update],

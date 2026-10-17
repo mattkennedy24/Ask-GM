@@ -1,4 +1,5 @@
 import { buildSystemPrompt } from "./prompt.js";
+import { describeGameReview } from "./moveReview.js";
 import { lengthHintFor } from "./classify.js";
 import { collectAllowedMoveKeys, findIllegalMoveMentions } from "./moveValidation.js";
 import { parseFollowUps } from "./followUps.js";
@@ -38,7 +39,7 @@ export function createCoach({ anthropic, model, personalities, maxTokens = 700, 
    * @param {object} input already validated by validateChatPayload
    * @returns {Promise<{ response: string, followUps: string[], offTopic?: boolean }>}
    */
-  async function ask({ selectedGM, fen, question, history, moveHistory, topLines, openingName, moveReview = null }) {
+  async function ask({ selectedGM, fen, question, history, moveHistory, topLines, openingName, moveReview = null, gameReview = [] }) {
     if (detectOffTopic(question)) {
       return { response: pickDismissal(selectedGM, random), followUps: REDIRECT_FOLLOW_UPS, offTopic: true };
     }
@@ -50,6 +51,7 @@ export function createCoach({ anthropic, model, personalities, maxTokens = 700, 
       topLines,
       openingName,
       moveReview,
+      gameReview,
       lengthHint: lengthHintFor(question),
     });
     const messages = [...history, { role: "user", content: question }];
@@ -58,7 +60,9 @@ export function createCoach({ anthropic, model, personalities, maxTokens = 700, 
     const firstText = toPlainText(first.text);
     if (!firstText) throw new EmptyResponseError();
 
-    const allowed = collectAllowedMoveKeys({ fen, topLines, moveHistory });
+    // The review may mention what the engine preferred many moves ago; those moves are fair to quote.
+    const extraKeys = [...(describeGameReview({ moveHistory, flagged: gameReview })?.preferredKeys ?? [])];
+    const allowed = collectAllowedMoveKeys({ fen, topLines, moveHistory, extraKeys });
     const firstIllegal = findIllegalMoveMentions(firstText, allowed);
     if (firstIllegal.length === 0) return { response: firstText, followUps: first.followUps };
 

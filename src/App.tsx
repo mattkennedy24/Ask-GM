@@ -10,6 +10,7 @@ import GMSelector from "./components/GMSelector";
 import Header, { type AppMode } from "./components/Header";
 import LoadGameDialog from "./components/LoadGameDialog";
 import MoveNotation from "./components/MoveNotation";
+import { ReviewControls, ReviewProgressBar, ReviewSummaryRows } from "./components/ReviewBar";
 import OpeningsPanel from "./components/OpeningsPanel";
 import ResultCard from "./components/ResultCard";
 import Toast from "./components/Toast";
@@ -20,6 +21,8 @@ import type { EngineLine } from "./engine/uci";
 import { useBetaGate } from "./hooks/useBetaGate";
 import { type SendContext, useChat } from "./hooks/useChat";
 import { useChessGame } from "./hooks/useChessGame";
+import { useEvalBook } from "./hooks/useEvalBook";
+import { useGameReview } from "./hooks/useGameReview";
 import { useLatest } from "./hooks/useLatest";
 import { useLesson } from "./hooks/useLesson";
 import { useMediaQuery } from "./hooks/useMediaQuery";
@@ -35,6 +38,7 @@ import { kingInCheckSquare, START_FEN } from "./lib/lines";
 import { preferredSan, verdictLabel } from "./lib/moveReview";
 import { detectOpening } from "./lib/openingDetection";
 import { gameOutcome } from "./lib/outcome";
+import { nextCritical, reviewedMoves, summarizeReview } from "./lib/reviewSummary";
 
 const NO_LINES: EngineLine[] = [];
 
@@ -58,6 +62,12 @@ export default function App() {
   const [loadOpen, setLoadOpen] = useState(false);
 
   const learning = mode === "learn";
+
+  // A lesson that is playing itself must not carry on, unseen, while you are back at your own game.
+  const { pause: pauseLesson } = lesson;
+  useEffect(() => {
+    if (!learning) pauseLesson();
+  }, [learning, pauseLesson]);
 
   // ── The position on screen ─────────────────────────────────────────
   // It comes from the game, or from the open lesson. Everything below (engine, chat context,
@@ -94,8 +104,30 @@ export default function App() {
     return [bestMove.slice(0, 2) as Square, bestMove.slice(2, 4) as Square, BOARD.engineArrow];
   }, [learning, previewing, bestMove]);
 
-  // ── How the last move was judged ───────────────────────────────────
-  const reviews = useMoveReviews(game.plies, engine.fen, engine.lines);
+  // ── How the moves were judged ──────────────────────────────────────
+  // The main engine looks at the position on screen and feeds the shared book; a second, quiet engine
+  // looks at the positions before your moves (and, on request, the whole game) so every move can be judged.
+  const evalBook = useEvalBook();
+  const recordEval = evalBook.record;
+  useEffect(() => {
+    if (engine.fen) recordEval(engine.fen, engine.lines);
+  }, [engine.fen, engine.lines, recordEval]);
+
+  const gameReview = useGameReview(evalBook.book, recordEval);
+  const { ensure: ensureReview, scan: scanReview } = gameReview;
+  useEffect(() => {
+    if (!learning && game.index > 0) ensureReview([game.plies[game.index - 1].fen]);
+  }, [learning, game.index, game.plies, ensureReview]);
+
+  const reviews = useMoveReviews(game.plies, evalBook.book, evalBook.version);
+  const summary = useMemo(() => summarizeReview(reviews), [reviews]);
+  // The summary belongs to a review that was actually run on this game, not to moves judged as you went.
+  const [reviewedGame, setReviewedGame] = useState<number | null>(null);
+  const showSummary = reviewedGame === gameId;
+  const startReview = () => {
+    setReviewedGame(gameId);
+    scanReview(game.plies.map((ply) => ply.fen));
+  };
   const verdict = !learning && game.index > 0 ? (reviews[game.index - 1] ?? null) : null;
   const playedPly = game.plies[game.index];
   const beforePly = game.plies[game.index - 1];
@@ -123,7 +155,8 @@ export default function App() {
   } else if (game.index > 0 && analysing && !outcome) {
     feedback = { kind: "checking" };
   } else {
-    feedback = { kind: "hint", text: game.index === 0 ? "Move a piece to begin, or load your own game from the menu." : "" };
+    const hint = game.plies.length > 1 ? "Step through the game with the arrow buttons or the \u2190 \u2192 keys." : "Move a piece to begin, or load your own game from the menu.";
+    feedback = { kind: "hint", text: game.index === 0 ? hint : "" };
   }
 
   // ── Opening name (play mode) ───────────────────────────────────────
@@ -148,6 +181,7 @@ export default function App() {
     topLines: lines,
     openingName: openingLabel,
     moveReview: learning || !standardStart ? null : verdict,
+    gameReview: learning || !standardStart ? [] : reviewedMoves(reviews, game.index),
     contextPrefix: lessonOpening ? `We are studying the ${lessonOpening.name} (ECO ${lessonOpening.eco}). ` : undefined,
   });
 
@@ -177,13 +211,14 @@ export default function App() {
   const quickAsks = useMemo(() => {
     if (outcome) return ["How did this game end?", "What was the turning point?", "What should I work on?"];
     const asks: string[] = [];
+    if (showSummary && summary.critical.length > 0) asks.push("What were my biggest mistakes?");
     if (verdict && (verdict.quality === "inaccuracy" || verdict.quality === "mistake" || verdict.quality === "blunder") && playedPly?.san) {
       asks.push(`Why was ${scoreLabel(game.index, playedPly.san)} ${verdict.quality === "inaccuracy" ? "an" : "a"} ${verdictLabel(verdict.quality).toLowerCase()}?`);
     }
     if (openingName) asks.push(`Explain the ${openingName}`);
     asks.push("Best move?", "Explain the plan", "What did I do wrong?", "Why this engine move?");
     return asks.slice(0, 5);
-  }, [outcome, verdict, playedPly?.san, game.index, openingName]);
+  }, [outcome, verdict, playedPly?.san, game.index, openingName, showSummary, summary.critical.length]);
 
   // A new reply while another section is showing → a dot on the Chat tab.
   const chatVisible = isDesktop || phoneTab === "chat";
@@ -194,6 +229,8 @@ export default function App() {
 
   // ── Game actions ───────────────────────────────────────────────────
   const startNewGame = () => {
+    // A review of the old game must not carry on, and report progress, inside the new one.
+    gameReview.cancel();
     const previous = game.newGame();
     const previousId = gameId;
     setGameId((id) => id + 1);
@@ -206,6 +243,7 @@ export default function App() {
           ? {
               label: "Undo",
               run: () => {
+                gameReview.cancel();
                 game.load(previous);
                 setGameId(previousId);
               },
@@ -217,7 +255,13 @@ export default function App() {
   const loadGame = (text: string) => {
     const result = importGame(text);
     if (result.ok) {
+      gameReview.cancel();
       game.load(result.state);
+      // A pasted game is there to be studied: start judging its moves straight away.
+      if (result.state.plies.length > 2) {
+        scanReview(result.state.plies.map((ply) => ply.fen));
+        setReviewedGame(gameId + 1);
+      }
       setGameId((id) => id + 1);
       setMode("play");
       setPhoneTab("board");
@@ -306,6 +350,7 @@ export default function App() {
       mate={top?.mate ?? null}
       thinking={analysing}
       outcome={outcome}
+      capturesKnown={standardStart}
       canBack={view.canBack}
       canForward={view.canForward}
       onBack={view.back}
@@ -324,7 +369,22 @@ export default function App() {
     <section className="side-section" aria-label="Moves">
       <div className="panel-head">
         <h2 className="type-label">Moves</h2>
+        <ReviewControls
+          plies={game.plies.length - 1}
+          reviewed={showSummary}
+          progress={gameReview.progress}
+          unavailable={gameReview.unavailable}
+          flagged={summary.critical.length}
+          onStart={startReview}
+          onStop={gameReview.cancel}
+          onNext={() => {
+            const target = nextCritical(summary.critical, game.index);
+            if (target !== null) game.navigate(target);
+          }}
+        />
       </div>
+      <ReviewProgressBar progress={gameReview.progress} />
+      <ReviewSummaryRows summary={showSummary ? summary : null} />
       <MoveNotation sanMoves={game.sanMoves} verdicts={reviews} index={game.index} onNavigate={game.navigate} />
     </section>
   );

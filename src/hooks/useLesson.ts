@@ -43,6 +43,9 @@ export function useLesson() {
     return () => clearTimeout(timer);
   }, [playing, index, lastIndex]);
 
+  /** Stop auto-play without touching anything else (used when the lesson goes off screen). */
+  const pause = useCallback(() => setState((s) => (s.playing ? { ...s, playing: false } : s)), []);
+
   const select = useCallback((next: Opening) => setState({ opening: next, variation: -1, index: 0, playing: false }), []);
   const exit = useCallback(() => setState(IDLE), []);
   const selectVariation = useCallback(
@@ -91,6 +94,7 @@ export function useLesson() {
     back,
     forward,
     togglePlay,
+    pause,
   };
 }
 
