@@ -34,7 +34,16 @@ export function useChessGame() {
   const back = useCallback(() => commit(goTo(stateRef.current, stateRef.current.index - 1)), [commit]);
   const forward = useCallback(() => commit(goTo(stateRef.current, stateRef.current.index + 1)), [commit]);
   const takeBack = useCallback(() => commit(undo(stateRef.current)), [commit]);
-  const reset = useCallback(() => commit(INITIAL_GAME), [commit]);
+
+  /** Start over. Returns the game that was on the board so the caller can offer to bring it back. */
+  const newGame = useCallback((): GameState => {
+    const previous = stateRef.current;
+    commit(INITIAL_GAME);
+    return previous;
+  }, [commit]);
+
+  /** Put a whole game on the board (a loaded PGN or FEN, or a game brought back after "New game"). */
+  const load = useCallback((game: GameState) => commit(game), [commit]);
 
   const ply = currentPly(state);
   const lists = useMemo(
@@ -62,6 +71,9 @@ export function useChessGame() {
     back,
     forward,
     takeBack,
-    reset,
+    newGame,
+    load,
+    /** The whole game, for exporting or for bringing it back later. */
+    snapshot: state,
   };
 }

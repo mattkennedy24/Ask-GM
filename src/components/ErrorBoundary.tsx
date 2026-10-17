@@ -23,13 +23,9 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
   render() {
     if (!this.state.failed) return this.props.children;
     return (
-      <div role="alert" className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center" style={{ background: "var(--c-bg)" }}>
-        <h1 className="text-2xl" style={{ fontFamily: "var(--f-serif)", color: "var(--c-gold-bright)" }}>
-          Something went wrong
-        </h1>
-        <p className="max-w-sm text-sm" style={{ color: "var(--c-text-soft)" }}>
-          The board hit an unexpected error. Reloading usually fixes it — your game will start fresh.
-        </p>
+      <div role="alert" className="crash">
+        <h1 className="type-display">Something went wrong</h1>
+        <p className="type-body soft">The board hit an unexpected error. Reloading usually fixes it. Your game will start fresh.</p>
         <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
           Reload
         </button>

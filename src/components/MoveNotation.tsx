@@ -1,15 +1,18 @@
 import { useEffect, useRef } from "react";
+import { type MoveVerdict, verdictGlyph, verdictLabel } from "../lib/moveReview";
 
 interface MoveNotationProps {
   /** Every move of the line in SAN, including any beyond the position on screen. */
   sanMoves: string[];
+  /** How each move was judged, aligned with `sanMoves` (null while unknown). */
+  verdicts: (MoveVerdict | null)[];
   /** Position on screen: 0 = start, n = after n plies. */
   index: number;
   onNavigate: (index: number) => void;
 }
 
 /** The move list as numbered pairs. Click a move to jump to the position after it. */
-export default function MoveNotation({ sanMoves, index, onNavigate }: MoveNotationProps) {
+export default function MoveNotation({ sanMoves, verdicts, index, onNavigate }: MoveNotationProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Keep the current move visible by scrolling the list itself. (scrollIntoView would also scroll the
@@ -26,11 +29,7 @@ export default function MoveNotation({ sanMoves, index, onNavigate }: MoveNotati
   }, [index, sanMoves.length]);
 
   if (sanMoves.length === 0) {
-    return (
-      <p className="px-1 text-xs" style={{ color: "var(--c-text-muted)", fontFamily: "var(--f-mono)" }}>
-        No moves yet — make a move on the board.
-      </p>
-    );
+    return <p className="type-small muted moves-empty">No moves yet. Make a move on the board.</p>;
   }
 
   const pairs: { number: number; white: string; black: string | null }[] = [];
@@ -38,43 +37,35 @@ export default function MoveNotation({ sanMoves, index, onNavigate }: MoveNotati
     pairs.push({ number: i / 2 + 1, white: sanMoves[i], black: sanMoves[i + 1] ?? null });
   }
 
-  const moveButton = (san: string, plyIndex: number) => (
-    <button
-      type="button"
-      onClick={() => onNavigate(plyIndex)}
-      aria-current={index === plyIndex ? "true" : undefined}
-      className="rounded px-1.5 py-0.5 text-xs"
-      style={{
-        fontFamily: "var(--f-mono)",
-        fontWeight: index === plyIndex ? 600 : 400,
-        background: index === plyIndex ? "var(--c-gold-dim)" : "transparent",
-        color: index === plyIndex ? "var(--c-gold-bright)" : "var(--c-text-soft)",
-        border: `1px solid ${index === plyIndex ? "var(--c-gold)" : "transparent"}`,
-      }}
-    >
-      {san}
-    </button>
-  );
-
-  return (
-    <div ref={containerRef} role="group" aria-label="Moves" className="relative flex flex-wrap items-center gap-x-0.5 gap-y-0.5 overflow-y-auto" style={{ maxHeight: "4.75rem" }}>
+  const moveButton = (san: string, plyIndex: number) => {
+    const verdict = verdicts[plyIndex - 1] ?? null;
+    const glyph = verdict ? verdictGlyph(verdict.quality) : "";
+    return (
       <button
         type="button"
-        onClick={() => onNavigate(0)}
-        aria-current={index === 0 ? "true" : undefined}
-        aria-label="Starting position"
-        className="rounded px-1.5 py-0.5 text-xs"
-        style={{
-          fontFamily: "var(--f-mono)",
-          color: index === 0 ? "var(--c-gold-bright)" : "var(--c-text-muted)",
-          border: `1px solid ${index === 0 ? "var(--c-gold)" : "transparent"}`,
-        }}
+        onClick={() => onNavigate(plyIndex)}
+        aria-current={index === plyIndex ? "true" : undefined}
+        aria-label={verdict && glyph ? `${san}, ${verdictLabel(verdict.quality).toLowerCase()}` : san}
+        className="move-chip num"
       >
+        {san}
+        {glyph && (
+          <span className={`mark mark-${verdict?.quality}`} aria-hidden="true">
+            {glyph}
+          </span>
+        )}
+      </button>
+    );
+  };
+
+  return (
+    <div ref={containerRef} role="group" aria-label="Moves" className="moves">
+      <button type="button" onClick={() => onNavigate(0)} aria-current={index === 0 ? "true" : undefined} aria-label="Starting position" className="move-chip">
         Start
       </button>
       {pairs.map((pair) => (
-        <span key={pair.number} className="inline-flex items-center">
-          <span className="select-none px-0.5 text-xs tabular-nums" style={{ color: "var(--c-text-muted)", fontFamily: "var(--f-mono)" }}>
+        <span key={pair.number} className="move-pair">
+          <span className="move-number type-small num muted" aria-hidden="true">
             {pair.number}.
           </span>
           {moveButton(pair.white, pair.number * 2 - 1)}

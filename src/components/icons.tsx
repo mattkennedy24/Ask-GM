@@ -6,9 +6,9 @@ interface IconProps {
   className?: string;
 }
 
-/** Stroke icons on a 24×24 grid, in the style of the Lucide set. Decorative: always aria-hidden. */
+/** One family of stroke icons on a 24×24 grid: 1.75px line, round caps. Decorative: always aria-hidden. */
 function createIcon(displayName: string, paths: ReactNode) {
-  const Icon = ({ size = 18, strokeWidth = 2, className }: IconProps) => (
+  const Icon = ({ size = 18, strokeWidth = 1.75, className }: IconProps) => (
     <svg
       width={size}
       height={size}
@@ -54,3 +54,14 @@ export const Board = createIcon(
 export const Lock = createIcon("Lock", <><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>);
 export const Search = createIcon("Search", <><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></>);
 export const ChevronLeft = createIcon("ChevronLeft", <path d="m15 18-6-6 6-6" />);
+export const More = createIcon(
+  "More",
+  <>
+    <circle cx="5" cy="12" r="1.2" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+    <circle cx="19" cy="12" r="1.2" fill="currentColor" />
+  </>,
+);
+export const Plus = createIcon("Plus", <><path d="M5 12h14" /><path d="M12 5v14" /></>);
+export const Upload = createIcon("Upload", <><path d="M12 15V3" /><path d="m7 8 5-5 5 5" /><path d="M5 21h14" /></>);
+export const Copy = createIcon("Copy", <><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2" /></>);

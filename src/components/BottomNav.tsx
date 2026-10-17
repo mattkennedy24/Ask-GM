@@ -19,32 +19,12 @@ const ITEMS: { id: MobileDestination; label: string; icon: ReactNode }[] = [
 /** Thumb-reach navigation for phones; desktop shows everything at once and does not use it. */
 export default function BottomNav({ active, onChange, chatUnread }: BottomNavProps) {
   return (
-    <nav
-      aria-label="Sections"
-      className="flex shrink-0 desk:hidden"
-      style={{
-        background: "var(--c-surface)",
-        borderTop: "1px solid var(--c-border)",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
-    >
+    <nav aria-label="Sections" className="bottom-nav desk:hidden">
       {ITEMS.map(({ id, label, icon }) => (
-        <button
-          key={id}
-          type="button"
-          className="nav-item relative"
-          aria-current={active === id ? "page" : undefined}
-          onClick={() => onChange(id)}
-        >
+        <button key={id} type="button" className="nav-item type-label" aria-current={active === id ? "page" : undefined} onClick={() => onChange(id)}>
           {icon}
           <span>{label}</span>
-          {id === "chat" && chatUnread && active !== "chat" && (
-            <span
-              aria-label="New reply"
-              className="absolute right-[calc(50%-1.5rem)] top-2 h-2 w-2 rounded-full"
-              style={{ background: "var(--gm)" }}
-            />
-          )}
+          {id === "chat" && chatUnread && active !== "chat" && <span aria-label="New reply" className="nav-dot" />}
         </button>
       ))}
     </nav>

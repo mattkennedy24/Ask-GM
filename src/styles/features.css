@@ -1,0 +1,959 @@
+/* The parts of the app, built from the tokens and primitives. One section per region of the screen. */
+@layer components {
+  /* ══ Shell ═══════════════════════════════════════════════════════════ */
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    /* Dynamic Island / notch */
+    padding-top: env(safe-area-inset-top);
+    background: var(--color-paper);
+  }
+
+  /* A newspaper masthead: the name, then a double rule. */
+  .masthead {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.75rem;
+    height: 3.5rem;
+    padding-inline: 1rem;
+    border-bottom: 3px double var(--color-ink);
+  }
+  .wordmark {
+    font: var(--type-wordmark);
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .wordmark em {
+    font-style: italic;
+    font-weight: 600;
+  }
+  .opening-tag {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .opening-tag .num {
+    color: var(--color-ink);
+    font-weight: 700;
+  }
+  .masthead-end {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    height: 100%;
+    margin-left: auto;
+  }
+  .tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 1.25rem;
+    height: 100%;
+  }
+
+  .gm-picker {
+    display: inline-flex;
+    gap: 0.25rem;
+  }
+  .gm-picker-fill {
+    display: flex;
+    width: 100%;
+  }
+  .gm-picker-fill .gm-pick {
+    flex: 1;
+    justify-content: center;
+    padding-right: 0.25rem;
+  }
+  .gm-pick[data-gm="Magnus"] {
+    --avatar-ink: var(--color-magnus);
+  }
+  .gm-pick[data-gm="Hikaru"] {
+    --avatar-ink: var(--color-hikaru);
+  }
+  .gm-pick[data-gm="Bobby"] {
+    --avatar-ink: var(--color-bobby);
+  }
+
+  .menu-root {
+    position: relative;
+  }
+  .menu {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    right: 0;
+    z-index: 40;
+    min-width: 15rem;
+    padding: 0.25rem;
+    border: 1px solid var(--color-ink);
+    border-radius: var(--radius-tile);
+    background: var(--color-surface);
+    animation: rise-in var(--dur-base) var(--ease-out) both;
+  }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0 0.75rem;
+    border: 0;
+    border-radius: calc(var(--radius-tile) - 4px);
+    background: transparent;
+    color: var(--color-ink);
+    text-align: left;
+  }
+  .menu-item:hover:not(:disabled),
+  .menu-item:focus-visible {
+    background: var(--color-paper-2);
+  }
+  .menu-item:disabled {
+    color: var(--color-ink-3);
+  }
+
+  /* ══ Desktop layout: board on the left, analysis and chat on the right ═══ */
+  .workspace {
+    display: flex;
+    flex: 1;
+    width: 100%;
+    max-width: 88rem;
+    min-height: 0;
+    margin-inline: auto;
+  }
+  .board-col {
+    flex: none;
+    width: calc(var(--board-size) + 4.5rem);
+    overflow-y: auto;
+    border-right: 1px solid var(--color-rule);
+  }
+  .side-col {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    max-width: 54rem;
+    min-width: 0;
+    min-height: 0;
+  }
+  /* A firmer rule between what the engine says and what the coach says. */
+  .side-top {
+    flex: none;
+    border-bottom: 1px solid var(--color-ink);
+  }
+  .side-top .result {
+    margin: 1rem;
+  }
+  .side-section {
+    border-bottom: 1px solid var(--color-rule);
+  }
+  .chat-col {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .learn-layout {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+  .learn-col {
+    flex: 0 0 26rem;
+    min-width: 0;
+    overflow: hidden;
+    border-right: 1px solid var(--color-rule);
+  }
+  .learn-layout .chat-col {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  /* ══ Phone layout: one section at a time, bottom navigation ════════════ */
+  .phone-main {
+    flex: 1;
+    min-height: 0;
+  }
+  .phone-scroll {
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .phone-column {
+    width: 100%;
+    max-width: 40rem;
+    margin-inline: auto;
+  }
+  .phone-chat {
+    height: 100%;
+  }
+  .phone-stack > * + *,
+  .phone-learn {
+    border-top: 1px solid var(--color-rule);
+  }
+  .phone-learn .learn {
+    height: auto;
+    padding-bottom: 1rem;
+  }
+  .phone-learn .lesson-list,
+  .phone-learn .lesson-moves {
+    overflow: visible;
+  }
+
+  .bottom-nav {
+    display: flex;
+    flex: none;
+    border-top: 1px solid var(--color-ink);
+    background: var(--color-paper);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .nav-item {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 3.5rem;
+    border: 0;
+    background: transparent;
+    color: var(--color-ink-3);
+    transition: color var(--dur-base) var(--ease-out);
+  }
+  .nav-item[aria-current="page"] {
+    color: var(--color-ink);
+  }
+  .nav-item[aria-current="page"]::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    right: 28%;
+    left: 28%;
+    height: 3px;
+    background: var(--color-ink);
+  }
+  .nav-dot {
+    position: absolute;
+    top: 0.5rem;
+    left: calc(50% + 0.75rem);
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--gm);
+  }
+
+  /* ══ The board panel ═════════════════════════════════════════════════ */
+  .board-panel {
+    display: flex;
+    flex-direction: column;
+  }
+  .brief {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 3rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-rule);
+  }
+  .brief .type-label {
+    white-space: nowrap;
+  }
+  .brief-eval {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    transition: opacity var(--dur-base) var(--ease-out);
+  }
+  .brief-eval[data-pending] {
+    opacity: 0.5;
+  }
+
+  .board-stage {
+    padding-top: 0.5rem;
+  }
+  .board-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  /* On a phone the board runs edge to edge between two rules; on a laptop it sits in a frame. */
+  .board-frame {
+    flex: 1;
+    min-width: 0;
+    border-block: 2px solid var(--color-ink);
+  }
+  /* What each side has taken: White's on one side, Black's on the other. */
+  .captures {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.25rem 1rem;
+  }
+  .captured {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 1.75rem;
+  }
+  .captured-pieces {
+    display: inline-flex;
+    align-items: center;
+  }
+  .captured-piece {
+    width: 1.375rem;
+    height: 1.375rem;
+    margin-right: -0.5rem;
+  }
+  .captured-piece:last-child {
+    margin-right: 0;
+  }
+
+  .eval-bar {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--color-ink);
+    background: var(--color-ink);
+    transition: opacity var(--dur-slow) var(--ease-out);
+  }
+  .eval-bar[data-stale] {
+    opacity: 0.45;
+  }
+  .eval-bar-vertical {
+    width: 1rem;
+    height: 100%;
+    min-height: 3.75rem;
+  }
+  .eval-bar-horizontal {
+    width: 100%;
+    height: 0.375rem;
+    border-block: 0;
+    border-inline: 0;
+  }
+  .eval-white {
+    position: absolute;
+    background: var(--color-surface);
+    transition:
+      height 0.6s var(--ease-out),
+      width 0.6s var(--ease-out);
+  }
+  .eval-bar-vertical .eval-white {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: var(--share);
+  }
+  .eval-bar-vertical.eval-bar-flipped .eval-white {
+    top: 0;
+    bottom: auto;
+  }
+  .eval-bar-horizontal .eval-white {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--share);
+  }
+  .eval-bar-horizontal.eval-bar-flipped .eval-white {
+    right: 0;
+    left: auto;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+  .controls-ask,
+  .push {
+    margin-left: auto;
+  }
+
+  /* One line under the board: how the move was judged, or the lesson note. Its height is reserved so nothing jumps. */
+  .feedback {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    min-height: 4.5rem;
+    padding: 0.75rem 1rem 1rem;
+    border-top: 1px solid var(--color-rule);
+  }
+  .feedback-note {
+    min-height: 7rem;
+  }
+  .glyph {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    padding: 0 0.375rem;
+    border-radius: var(--radius-pill);
+    font: var(--type-ui);
+  }
+  .glyph-best {
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+  .glyph-good {
+    border: 1px solid var(--color-ink);
+    color: var(--color-ink);
+  }
+  .glyph-inaccuracy {
+    background: var(--color-paper-3);
+    color: var(--color-ink);
+  }
+  .glyph-mistake {
+    background: color-mix(in srgb, var(--color-danger) 14%, var(--color-paper));
+    color: var(--color-danger);
+  }
+  .glyph-blunder {
+    background: var(--color-danger);
+    color: var(--color-surface);
+  }
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-ink);
+    font: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 3px;
+  }
+  .link:hover {
+    background: var(--color-marker);
+  }
+
+  .result {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin: 0.5rem 1rem 1rem;
+    padding: 1.25rem;
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-tile);
+    text-align: center;
+  }
+  .result-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .result-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .lesson-note {
+    min-height: 6.5rem;
+    margin-inline: 1rem;
+    padding-left: 0.875rem;
+    border-left: 2px solid var(--color-ink);
+  }
+
+  /* ══ Section headers, moves and engine lines ═════════════════════════ */
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--color-rule);
+  }
+
+  .moves {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.125rem 0.25rem;
+    max-height: 6rem;
+    padding: 0.5rem 1rem;
+    overflow-y: auto;
+  }
+  .moves-empty {
+    padding: 0.75rem 1rem;
+  }
+  .move-pair {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+  }
+  .move-number {
+    padding-left: 0.25rem;
+    user-select: none;
+  }
+  .move-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    min-height: 1.75rem;
+    padding: 0 0.5rem;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-ink-2);
+    font: var(--type-small);
+  }
+  .move-chip:hover:not([aria-current="true"]) {
+    background: var(--color-paper-2);
+    color: var(--color-ink);
+  }
+  .move-chip[aria-current="true"] {
+    background: var(--color-marker);
+    color: var(--color-ink);
+    font-weight: 700;
+  }
+  .mark {
+    font-weight: 700;
+  }
+  .mark-inaccuracy {
+    color: var(--color-ink-2);
+  }
+  .mark-mistake,
+  .mark-blunder {
+    color: var(--color-danger);
+  }
+  .move-chip[aria-current="true"] .mark {
+    color: var(--color-ink);
+  }
+
+  .engine-source {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .engine-lines {
+    display: flex;
+    flex-direction: column;
+  }
+  .engine-line {
+    display: grid;
+    grid-template-columns: 1rem 6.75rem 1fr;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.625rem 1rem 0.625rem calc(1rem - 3px);
+    border: 0;
+    border-bottom: 1px solid var(--color-rule);
+    border-left: 3px solid transparent;
+    background: transparent;
+    text-align: left;
+    transition: background-color var(--dur-base) var(--ease-out);
+  }
+  .engine-lines > li:last-child .engine-line {
+    border-bottom: 0;
+  }
+  .engine-line:hover {
+    background: var(--color-paper-2);
+  }
+  .engine-line[aria-pressed="true"] {
+    border-left-color: var(--color-engine);
+    background: var(--color-engine-wash);
+  }
+  .engine-score {
+    display: flex;
+    flex-direction: column;
+  }
+  .engine-moves {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  .engine-first {
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+  }
+  .engine-san {
+    padding: 0 0.5rem;
+    border-radius: 4px;
+    background: var(--color-paper-2);
+  }
+  .engine-line[aria-pressed="true"] .engine-san {
+    background: var(--color-surface);
+  }
+  .engine-san[data-active],
+  .engine-step[data-active] {
+    background: var(--color-engine);
+    color: var(--color-surface);
+  }
+  .engine-rest {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.375rem;
+    color: var(--color-ink-2);
+  }
+  .engine-step {
+    padding: 0 0.25rem;
+    border-radius: 4px;
+  }
+  .engine-empty {
+    padding: 1rem;
+  }
+  .engine-skeleton {
+    height: 3rem;
+    margin: 0.5rem 1rem;
+  }
+  .engine-steps {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem 0.75rem;
+    border-top: 1px solid var(--color-rule);
+  }
+
+  /* ══ Chat ════════════════════════════════════════════════════════════ */
+  .chat {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    background: var(--color-paper);
+  }
+  .chat-head {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-rule);
+  }
+  .chat-who {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+  .chat-log {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-height: 0;
+    padding: 1rem;
+    overflow-y: auto;
+  }
+  .msg-user {
+    align-self: flex-end;
+    max-width: 85%;
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--radius-tile);
+    background: var(--color-paper-2);
+    font: var(--type-body);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+  .msg-gm-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    max-width: 40rem;
+  }
+  /* What a coach says is set like a column of print: serif, with a rule in that coach's ink. */
+  .msg-gm {
+    padding-left: 0.875rem;
+    border-left: 2px solid var(--gm);
+    font: var(--type-lead);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+  .msg-thinking {
+    color: var(--gm);
+  }
+  .msg-note {
+    align-self: center;
+    text-align: center;
+  }
+  .msg-error {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: flex-start;
+    gap: 0.5rem;
+    max-width: 85%;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-danger);
+    border-left-width: 3px;
+    border-radius: var(--radius-tile);
+    background: var(--color-surface);
+  }
+  .followups {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-left: 0.875rem;
+  }
+
+  /* A move inside a reply: marked like a highlighter pen, and a button when it can be played right now. */
+  .move-token {
+    display: inline;
+    padding: 0 0.25em;
+    border: 0;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--color-marker) 70%, transparent);
+    color: var(--color-ink);
+    /* The sans runs larger than the serif around it, so it is eased down a little (em, not a new size). */
+    font-family: var(--font-sans);
+    font-size: 0.875em;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  button.move-token {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 3px;
+    transition:
+      background-color var(--dur-base) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
+  }
+  button.move-token:hover {
+    background: var(--color-marker);
+  }
+  button.move-token:active {
+    transform: scale(0.96);
+  }
+
+  .quick-asks {
+    display: flex;
+    flex: none;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem 0.5rem;
+    overflow-x: auto;
+    border-top: 1px solid var(--color-rule);
+    scrollbar-width: none;
+  }
+  .composer {
+    display: flex;
+    flex: none;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem 1rem;
+  }
+  .btn-send {
+    flex: none;
+    width: 2.75rem;
+    padding: 0;
+  }
+
+  /* ══ Opening lessons ═════════════════════════════════════════════════ */
+  .learn {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    height: 100%;
+    min-height: 0;
+    padding-top: 1rem;
+  }
+  .learn-head,
+  .search,
+  .chips,
+  .lesson-bar,
+  .lesson-description {
+    padding-inline: 1rem;
+  }
+  .learn-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .search {
+    position: relative;
+  }
+  .search-icon {
+    position: absolute;
+    top: 50%;
+    left: 1.875rem;
+    translate: 0 -50%;
+    color: var(--color-ink-3);
+    pointer-events: none;
+  }
+  .search-field {
+    padding-left: 2.75rem;
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .chips-scroll {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .lesson-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    border-top: 1px solid var(--color-rule);
+  }
+  .row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 0;
+    border-bottom: 1px solid var(--color-rule);
+    background: transparent;
+    text-align: left;
+    transition: background-color var(--dur-base) var(--ease-out);
+  }
+  .row:hover {
+    background: var(--color-paper-2);
+  }
+  .row-main,
+  .row-sub {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .row-main {
+    align-items: baseline;
+  }
+  .lesson-empty {
+    padding: 1.5rem 1rem;
+    text-align: center;
+  }
+  .lesson-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .lesson-title {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+  }
+  .lesson-count {
+    flex: none;
+    min-width: 3rem;
+    text-align: right;
+  }
+  .lesson-moves {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--color-rule);
+  }
+  .lesson-moves > li {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .lesson-moves .move-number {
+    width: 1.75rem;
+    padding-left: 0;
+    text-align: right;
+  }
+
+  /* ══ Dialogs, errors ═════════════════════════════════════════════════ */
+  .dialog-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  /* Spaced out so the dots of a hidden code are easy to count; the placeholder stays normal. */
+  .code-input:not(:placeholder-shown) {
+    letter-spacing: 0.2em;
+  }
+  .code-input[data-reveal]:not(:placeholder-shown) {
+    letter-spacing: 0.04em;
+  }
+  .error {
+    min-height: 1.25rem;
+    color: var(--color-danger);
+  }
+  .crash {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    height: 100%;
+    padding: 1.5rem;
+    background: var(--color-paper);
+    text-align: center;
+  }
+}
+
+/* ══ From the phone up to the laptop ═══════════════════════════════════ */
+@layer components {
+  .board-frame {
+    @variant desk {
+      flex: none;
+      width: var(--board-size);
+      border: 2px solid var(--color-ink);
+    }
+  }
+  .board-stage {
+    @variant desk {
+      padding: 0.75rem 1rem 0;
+    }
+  }
+  .captures {
+    @variant desk {
+      padding-inline: 1.5rem 0;
+    }
+  }
+  .quick-asks {
+    @variant desk {
+      flex-wrap: wrap;
+      overflow-x: visible;
+    }
+  }
+  .result {
+    @variant desk {
+      flex-direction: row;
+      justify-content: space-between;
+      text-align: left;
+    }
+  }
+  .result-text {
+    @variant desk {
+      align-items: flex-start;
+    }
+  }
+  .eval-bar-vertical {
+    @variant desk {
+      min-height: 0;
+    }
+  }
+  .brief,
+  .controls,
+  .feedback {
+    @variant desk {
+      padding-inline: 1.25rem;
+    }
+  }
+  .lesson-bar,
+  .learn-head,
+  .search,
+  .chips {
+    @variant desk {
+      padding-inline: 1.25rem;
+    }
+  }
+}

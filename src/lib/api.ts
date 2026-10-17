@@ -1,4 +1,5 @@
 import type { EngineLine } from "../engine/uci";
+import type { MoveVerdict } from "./moveReview";
 
 /** A failed API call, carrying the HTTP status (0 = never reached the server) and the server's error code. */
 export class ApiError extends Error {
@@ -56,6 +57,8 @@ export interface ChatRequest {
   moveHistory: string[];
   topLines: EngineLine[];
   openingName?: string;
+  /** The engine's verdict on the move just played; the server re-checks it against the move list. */
+  moveReview?: MoveVerdict | null;
 }
 
 export interface ChatResponse {

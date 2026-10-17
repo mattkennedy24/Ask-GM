@@ -1,0 +1,360 @@
+/* The small parts everything else is built from: type roles, buttons, chips, fields, tabs, dialogs. */
+@layer components {
+  /* ── Type roles ─────────────────────────────────────────────────────
+     display  modal titles and the result headline
+     title    panel titles, names, evaluation numbers
+     lead     what a coach says; lesson descriptions
+     body     what you type and read in UI
+     ui       buttons, tabs, chips (the "press me" voice)
+     small    secondary text
+     label    section labels and the phone navigation, always capitals */
+  .type-display {
+    font: var(--type-display);
+    letter-spacing: -0.015em;
+  }
+  .type-title {
+    font: var(--type-title);
+    letter-spacing: -0.01em;
+  }
+  .type-lead {
+    font: var(--type-lead);
+  }
+  .type-body {
+    font: var(--type-body);
+  }
+  .type-ui {
+    font: var(--type-ui);
+  }
+  .type-small {
+    font: var(--type-small);
+  }
+  .type-label {
+    font: var(--type-label);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  /* Digits that line up, for scores, move numbers and counters. */
+  .num {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  .muted {
+    color: var(--color-ink-3);
+  }
+  .soft {
+    color: var(--color-ink-2);
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0 1rem;
+    border: 1px solid var(--color-ink);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-ink);
+    font: var(--type-ui);
+    white-space: nowrap;
+    transition:
+      background-color var(--dur-base) var(--ease-out),
+      border-color var(--dur-base) var(--ease-out),
+      color var(--dur-base) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--color-paper-2);
+  }
+  .btn:active:not(:disabled) {
+    background: var(--color-paper-3);
+    transform: scale(0.97);
+  }
+  .btn:disabled {
+    border-color: var(--color-rule);
+    color: var(--color-ink-3);
+  }
+
+  .btn-primary {
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-ink-2);
+  }
+  .btn-primary:active:not(:disabled) {
+    background: var(--color-ink);
+  }
+  .btn-primary:disabled {
+    border-color: var(--color-paper-3);
+    background: var(--color-paper-3);
+    color: var(--color-ink-3);
+  }
+
+  .btn-icon {
+    width: 2.5rem;
+    padding: 0;
+    border-color: var(--color-rule);
+  }
+  .btn-icon:hover:not(:disabled) {
+    border-color: var(--color-ink);
+  }
+
+  .btn-quiet {
+    border-color: transparent;
+  }
+
+  /* ── Chips: suggestions and filters ───────────────────────────────── */
+  .chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0 0.875rem;
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-ink-2);
+    font: var(--type-ui);
+    white-space: nowrap;
+    transition:
+      background-color var(--dur-base) var(--ease-out),
+      border-color var(--dur-base) var(--ease-out),
+      color var(--dur-base) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
+  }
+  .chip:hover:not(:disabled) {
+    border-color: var(--color-ink);
+    color: var(--color-ink);
+  }
+  .chip:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .chip:disabled {
+    opacity: 0.45;
+  }
+  .chip[aria-pressed="true"] {
+    border-color: var(--color-ink);
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+  /* A coach's own suggestion: wears that coach's ink. */
+  .chip-gm {
+    border-color: color-mix(in srgb, var(--gm) 55%, transparent);
+    color: var(--gm);
+    text-align: left;
+    white-space: normal;
+  }
+  .chip-gm:hover:not(:disabled) {
+    border-color: var(--gm);
+    background: color-mix(in srgb, var(--gm) 9%, transparent);
+    color: var(--gm);
+  }
+
+  /* ── Text fields ──────────────────────────────────────────────────── */
+  .field {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    border: 1px solid var(--color-ink);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    /* 16px: anything smaller makes iOS Safari zoom the page when the field is focused. */
+    font: var(--type-body);
+  }
+  .field:focus-visible {
+    outline-offset: 0;
+  }
+  .field::placeholder {
+    color: var(--color-ink-3);
+  }
+  .field:disabled {
+    background: var(--color-paper-2);
+  }
+  .field[aria-invalid="true"] {
+    border-color: var(--color-danger);
+  }
+  .field[aria-invalid="true"]:focus-visible {
+    outline-color: var(--color-danger);
+  }
+  textarea.field {
+    min-height: 9rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-tile);
+    resize: vertical;
+  }
+
+  /* ── Tabs (Play / Learn) ──────────────────────────────────────────── */
+  .tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    padding: 0 0.125rem;
+    border: 0;
+    background: none;
+    color: var(--color-ink-3);
+    font: var(--type-ui);
+    transition: color var(--dur-base) var(--ease-out);
+  }
+  .tab:hover {
+    color: var(--color-ink);
+  }
+  .tab[aria-pressed="true"] {
+    color: var(--color-ink);
+  }
+  .tab[aria-pressed="true"]::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: var(--color-ink);
+  }
+
+  /* ── Coach picker ─────────────────────────────────────────────────── */
+  .gm-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0.25rem 0.875rem 0.25rem 0.25rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-ink-2);
+    font: var(--type-ui);
+    transition:
+      background-color var(--dur-base) var(--ease-out),
+      border-color var(--dur-base) var(--ease-out);
+  }
+  .gm-pick:hover:not(:disabled) {
+    background: var(--color-paper-2);
+  }
+  .gm-pick[aria-pressed="true"] {
+    border-color: var(--color-ink);
+    background: var(--color-surface);
+    color: var(--color-ink);
+  }
+
+  /* ── Monogram avatars ─────────────────────────────────────────────── */
+  .avatar {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1.5px solid var(--avatar-ink, var(--gm));
+    border-radius: 50%;
+    background: var(--color-surface);
+    color: var(--avatar-ink, var(--gm));
+    font: var(--type-monogram);
+  }
+  .avatar-lg {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  /* ── Dialogs and toasts ───────────────────────────────────────────── */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: color-mix(in srgb, var(--color-paper) 96%, transparent);
+    animation: fade-in var(--dur-base) var(--ease-out) both;
+  }
+  .dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    width: 100%;
+    max-width: 24rem;
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    padding: 1.5rem;
+    border: 1px solid var(--color-ink);
+    border-radius: var(--radius-tile);
+    background: var(--color-surface);
+    animation: rise-in var(--dur-slow) var(--ease-out) both;
+  }
+
+  .toast {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 4rem);
+    left: 50%;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: max-content;
+    max-width: calc(100vw - 2rem);
+    padding: 0.625rem 1.125rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-ink);
+    color: var(--color-paper);
+    font: var(--type-ui);
+    translate: -50% 0;
+    animation: toast-in var(--dur-slow) var(--ease-spring) both;
+  }
+  .toast button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-marker);
+    font: var(--type-ui);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* ── Placeholders ─────────────────────────────────────────────────── */
+  .skeleton {
+    border-radius: var(--radius-tile);
+    background: var(--color-paper-2);
+  }
+
+  /* Thinking: three dots that rise in turn. */
+  .dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 1.25rem;
+  }
+  .dots > span {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: currentColor;
+    animation: dot-rise 1s var(--ease-out) infinite;
+  }
+  .dots > span:nth-child(2) {
+    animation-delay: 0.12s;
+  }
+  .dots > span:nth-child(3) {
+    animation-delay: 0.24s;
+  }
+}
+
+/* Fingers need bigger targets than cursors do. */
+@media (pointer: coarse) {
+  @layer components {
+    .btn {
+      min-height: 2.75rem;
+    }
+    .btn-icon {
+      width: 2.75rem;
+    }
+    .chip {
+      min-height: 2.5rem;
+    }
+    .gm-pick {
+      min-height: 2.75rem;
+    }
+  }
+}

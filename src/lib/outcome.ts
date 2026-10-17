@@ -41,3 +41,22 @@ export function outcomeWhiteShare(outcome: GameOutcome): number {
   if (outcome.kind === "checkmate") return outcome.winner === "white" ? 100 : 0;
   return 50;
 }
+
+/** The result as chess scores it: "1-0", "0-1" or "1/2-1/2", written with a proper en dash and half sign. */
+export function outcomeNotation(outcome: GameOutcome): string {
+  if (outcome.kind === "checkmate") return outcome.winner === "white" ? "1\u20130" : "0\u20131";
+  return "\u00bd\u2013\u00bd";
+}
+
+/** One word for the headline of a finished game. */
+export function outcomeHeadline(outcome: GameOutcome): string {
+  if (outcome.kind === "checkmate") return "Checkmate";
+  return outcome.kind === "stalemate" ? "Stalemate" : "Draw";
+}
+
+/** A sentence that says who won, or why the game is drawn. */
+export function outcomeDetail(outcome: GameOutcome): string {
+  if (outcome.kind === "checkmate") return `${outcome.winner === "white" ? "White" : "Black"} wins.`;
+  if (outcome.kind === "stalemate") return "No legal move, and no check: the game is drawn.";
+  return outcome.reason === "insufficient material" ? "Neither side has the material to checkmate." : "Fifty moves without a capture or a pawn move.";
+}

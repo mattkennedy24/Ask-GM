@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import type { Arrow, CustomSquareStyles, Piece, PromotionPieceOption, Square } from "react-chessboard/dist/chessboard/types";
+import { BOARD } from "../lib/boardTheme";
 
 interface ChessBoardProps {
   position: string;
@@ -15,12 +16,6 @@ interface ChessBoardProps {
   orientation: "white" | "black";
   animationDuration?: number;
 }
-
-const LAST_MOVE = "rgba(205, 165, 0, 0.35)";
-const SELECTED = "rgba(91, 138, 240, 0.45)";
-const LEGAL_DOT = "radial-gradient(circle, rgba(63, 200, 122, 0.55) 26%, transparent 26%)";
-const LEGAL_CAPTURE = "radial-gradient(circle, transparent 55%, rgba(63, 200, 122, 0.55) 55%)";
-const CHECK = "radial-gradient(circle, rgba(229, 82, 78, 0.85) 0%, rgba(229, 82, 78, 0.4) 70%, transparent 100%)";
 
 export default function ChessBoard({
   position,
@@ -48,18 +43,18 @@ export default function ChessBoard({
   const squareStyles = useMemo((): CustomSquareStyles => {
     const styles: Record<string, Record<string, string>> = {};
     if (lastMove) {
-      styles[lastMove.from] = { backgroundColor: LAST_MOVE };
-      styles[lastMove.to] = { backgroundColor: LAST_MOVE };
+      styles[lastMove.from] = { backgroundColor: BOARD.lastMove };
+      styles[lastMove.to] = { backgroundColor: BOARD.lastMove };
     }
-    if (selectedSquare) styles[selectedSquare] = { backgroundColor: SELECTED };
+    if (selectedSquare) styles[selectedSquare] = { backgroundColor: BOARD.selected };
 
     if (legalSquares.length > 0) {
       const chess = new Chess(position);
       for (const square of legalSquares) {
-        styles[square] = { ...styles[square], background: chess.get(square as Square) ? LEGAL_CAPTURE : LEGAL_DOT };
+        styles[square] = { ...styles[square], background: chess.get(square as Square) ? BOARD.legalCapture : BOARD.legalDot };
       }
     }
-    if (kingInCheckSquare) styles[kingInCheckSquare] = { background: CHECK };
+    if (kingInCheckSquare) styles[kingInCheckSquare] = { backgroundColor: BOARD.check };
     return styles;
   }, [position, lastMove, selectedSquare, legalSquares, kingInCheckSquare]);
 
@@ -129,10 +124,7 @@ export default function ChessBoard({
   );
 
   return (
-    <div
-      className="w-full overflow-hidden rounded-lg"
-      style={{ background: "var(--c-raised)", boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)" }}
-    >
+    <div className="w-full">
       <Chessboard
         position={position}
         boardOrientation={orientation}
@@ -155,8 +147,10 @@ export default function ChessBoard({
         promotionToSquare={promotion?.to ?? null}
         promotionDialogVariant="modal"
         onPromotionPieceSelect={handlePromotionSelect}
-        customDarkSquareStyle={{ backgroundColor: "#a0785a" }}
-        customLightSquareStyle={{ backgroundColor: "#ede0c8" }}
+        customDarkSquareStyle={{ backgroundColor: BOARD.dark }}
+        customLightSquareStyle={{ backgroundColor: BOARD.light }}
+        customArrowColor={BOARD.userArrow}
+        customNotationStyle={BOARD.notation}
       />
     </div>
   );

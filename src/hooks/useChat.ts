@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { EngineLine } from "../engine/uci";
 import { GM_NAMES, GMS, type GMName } from "../data/gms";
 import { ApiError, askGM } from "../lib/api";
+import type { MoveVerdict } from "../lib/moveReview";
 
 export interface ChatMessage {
   id: string;
@@ -11,6 +12,8 @@ export interface ChatMessage {
   fen: string;
   /** Plies played when the message was written. */
   ply: number;
+  /** Which game or lesson it belongs to. A new game starts a new scope, so old answers never leak into it. */
+  scope: string;
   followUps?: string[];
   /**
    * welcome – the opening greeting
@@ -24,9 +27,13 @@ export interface ChatMessage {
 export interface SendContext {
   fen: string;
   ply: number;
+  /** See ChatMessage.scope. */
+  scope: string;
   moveHistory: string[];
   topLines: EngineLine[];
   openingName?: string;
+  /** How the move that led to this position was judged, when the engine has looked deeply enough to say. */
+  moveReview?: MoveVerdict | null;
   /** Prepended to the question the model sees, but not shown in the chat (e.g. lesson context). */
   contextPrefix?: string;
 }
@@ -36,12 +43,12 @@ const MAX_PLY_DISTANCE = 8;
 
 /**
  * The turns worth sending back to the model: real exchanges (no greetings, notes or
- * errors) that were about a position near the current one. Answers about a position
- * the board left long ago would only confuse the model.
+ * errors) from the same game or lesson, about a position near the current one. Answers
+ * about a position the board left long ago, or about another game, would only confuse the model.
  */
-export function buildHistory(messages: readonly ChatMessage[], ply: number) {
+export function buildHistory(messages: readonly ChatMessage[], ply: number, scope: string) {
   return messages
-    .filter((m) => !m.kind && Math.abs(m.ply - ply) <= MAX_PLY_DISTANCE)
+    .filter((m) => !m.kind && m.scope === scope && Math.abs(m.ply - ply) <= MAX_PLY_DISTANCE)
     .slice(-MAX_HISTORY_TURNS)
     .map((m) => ({ role: m.role === "user" ? ("user" as const) : ("assistant" as const), content: m.text }));
 }
@@ -54,7 +61,7 @@ const nextId = () => `m${++idCounter}`;
 function initialThreads(): Threads {
   const threads = {} as Threads;
   for (const name of GM_NAMES) {
-    threads[name] = [{ id: `welcome-${name}`, role: "gm", text: GMS[name].welcome, fen: "", ply: 0, kind: "welcome" }];
+    threads[name] = [{ id: `welcome-${name}`, role: "gm", text: GMS[name].welcome, fen: "", ply: 0, scope: "", kind: "welcome" }];
   }
   return threads;
 }
@@ -91,8 +98,8 @@ export function useChat(options: { betaKey: string | null; onUnauthorized: () =>
       pendingRef.current = gm;
       setPendingGM(gm);
 
-      const base = { fen: context.fen, ply: context.ply };
-      const conversationHistory = buildHistory(threadsRef.current[gm], context.ply);
+      const base = { fen: context.fen, ply: context.ply, scope: context.scope };
+      const conversationHistory = buildHistory(threadsRef.current[gm], context.ply, context.scope);
       update(gm, (messages) => [...messages, { id: nextId(), role: "user", text, ...base }]);
 
       try {
@@ -105,6 +112,7 @@ export function useChat(options: { betaKey: string | null; onUnauthorized: () =>
             moveHistory: context.moveHistory,
             topLines: context.topLines,
             openingName: context.openingName,
+            moveReview: context.moveReview ?? null,
           },
           optionsRef.current.betaKey,
         );
@@ -141,7 +149,7 @@ export function useChat(options: { betaKey: string | null; onUnauthorized: () =>
 
   /** Add a local announcement to a thread (not sent to the model). */
   const addNote = useCallback(
-    (gm: GMName, text: string, position: { fen: string; ply: number }) => {
+    (gm: GMName, text: string, position: { fen: string; ply: number; scope: string }) => {
       update(gm, (messages) => [...messages, { id: nextId(), role: "gm", kind: "note", text, ...position }]);
     },
     [update],

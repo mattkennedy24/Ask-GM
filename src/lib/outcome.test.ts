@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
-import { describeOutcome, gameOutcome, outcomeWhiteShare } from "./outcome";
+import { describeOutcome, gameOutcome, outcomeDetail, outcomeHeadline, outcomeNotation, outcomeWhiteShare } from "./outcome";
 
 function fenAfter(...sans: string[]): string {
   const chess = new Chess();
@@ -44,5 +44,24 @@ describe("describeOutcome / outcomeWhiteShare", () => {
     expect(outcomeWhiteShare({ kind: "checkmate", winner: "white" })).toBe(100);
     expect(outcomeWhiteShare({ kind: "checkmate", winner: "black" })).toBe(0);
     expect(outcomeWhiteShare({ kind: "stalemate" })).toBe(50);
+  });
+});
+
+describe("result wording", () => {
+  it("writes the result the way a scoresheet does", () => {
+    expect(outcomeNotation({ kind: "checkmate", winner: "white" })).toBe("1\u20130");
+    expect(outcomeNotation({ kind: "checkmate", winner: "black" })).toBe("0\u20131");
+    expect(outcomeNotation({ kind: "stalemate" })).toBe("\u00bd\u2013\u00bd");
+    expect(outcomeNotation({ kind: "draw", reason: "the fifty-move rule" })).toBe("\u00bd\u2013\u00bd");
+  });
+
+  it("gives each ending a headline and a plain sentence", () => {
+    expect(outcomeHeadline({ kind: "checkmate", winner: "black" })).toBe("Checkmate");
+    expect(outcomeHeadline({ kind: "stalemate" })).toBe("Stalemate");
+    expect(outcomeHeadline({ kind: "draw", reason: "insufficient material" })).toBe("Draw");
+    expect(outcomeDetail({ kind: "checkmate", winner: "black" })).toBe("Black wins.");
+    expect(outcomeDetail({ kind: "stalemate" })).toMatch(/no legal move/i);
+    expect(outcomeDetail({ kind: "draw", reason: "insufficient material" })).toMatch(/material/);
+    expect(outcomeDetail({ kind: "draw", reason: "the fifty-move rule" })).toMatch(/fifty/i);
   });
 });
