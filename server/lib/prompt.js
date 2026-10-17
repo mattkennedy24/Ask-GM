@@ -1,5 +1,6 @@
 import { Chess } from "chess.js";
 import {
+  describeGameResult,
   formatEval,
   formatPvLine,
   getFileStatus,
@@ -7,6 +8,8 @@ import {
   getKingSafety,
   getMaterialBalance,
 } from "./chessContext.js";
+import { describeMoveReview } from "./moveReview.js";
+import { getTacticalFacts } from "./tactics.js";
 
 const MAX_LISTED_LEGAL_MOVES = 40;
 
@@ -16,11 +19,12 @@ function formatMoveHistory(moves) {
     .trim();
 }
 
-function positionSection({ chess, fen, moveHistory, openingName }) {
+function positionSection({ chess, fen, moveHistory, openingName, moveReview }) {
   const sideToMove = chess.turn() === "w" ? "White" : "Black";
+  const result = describeGameResult(fen);
   const lines = [
     "═══════════════════════════════════",
-    `CURRENT POSITION (move ${chess.moveNumber()}, ${sideToMove} to play)`,
+    result ? `CURRENT POSITION (move ${chess.moveNumber()}, game over)` : `CURRENT POSITION (move ${chess.moveNumber()}, ${sideToMove} to play)`,
     "═══════════════════════════════════",
     `FEN: ${fen}`,
   ];
@@ -28,25 +32,36 @@ function positionSection({ chess, fen, moveHistory, openingName }) {
   if (openingName) lines.push(`Opening: ${openingName}`);
   if (moveHistory.length > 0) lines.push(`Moves so far: ${formatMoveHistory(moveHistory)}`);
 
-  lines.push("", "POSITION FACTS:");
+  lines.push("", "POSITION FACTS (computed from the board, so they are reliable):");
+  if (result) lines.push(`• GAME OVER. ${result}`);
   lines.push(`• Phase: ${getGamePhase(fen)}`);
   lines.push(`• ${getMaterialBalance(fen)}`);
   const files = getFileStatus(fen);
   if (files) lines.push(`• Files: ${files}`);
   const kings = getKingSafety(fen);
   if (kings) lines.push(`• ${kings}`);
-  if (chess.inCheck()) lines.push(`• ${sideToMove} is in check.`);
+  if (chess.inCheck() && !result) lines.push(`• ${sideToMove} is in check.`);
 
-  if (chess.isGameOver()) {
-    lines.push("• The game is OVER (checkmate, stalemate or a draw).");
-  } else {
+  for (const fact of getTacticalFacts(fen)) lines.push(`• ${fact}`);
+
+  if (!result) {
     const legal = chess.moves();
     if (legal.length <= MAX_LISTED_LEGAL_MOVES) lines.push(`• Legal moves: ${legal.join(", ")}`);
   }
+
+  const review = describeMoveReview({ fen, moveHistory, review: moveReview });
+  if (review) lines.push(`• LAST MOVE REVIEW (from the engine): ${review}`);
   return lines.join("\n");
 }
 
 function engineSection({ fen, topLines }) {
+  if (describeGameResult(fen)) {
+    return [
+      "ENGINE ANALYSIS: none, because the game is over and there are no moves left to play.",
+      "Do not recommend a move for either side in the final position. You may discuss how the game was decided, the turning points, and what the losing side could have done differently earlier, naming only moves from the move list above.",
+    ].join("\n");
+  }
+
   const rendered = [];
   topLines.forEach((line, i) => {
     const san = formatPvLine(fen, line.pv, 7);
@@ -75,10 +90,12 @@ function guidelinesSection({ gm, lengthHint }) {
     "RESPONSE GUIDELINES:",
     `- Stay fully in character as ${gm.name} at all times. Voice, attitude and chess philosophy must be unmistakable.`,
     `- Length for this question: ${lengthHint}.`,
-    "- Write exactly as you would text a friend who asked for advice: plain conversational prose, no markdown — no asterisks, headers, bullets, numbered lists or backticks.",
+    "- Write exactly as you would text a friend who asked for advice: plain conversational prose, no markdown — no asterisks, headers, bullets, numbered lists or backticks — and no emoji.",
     "- Use standard algebraic notation for moves (Nf3, Bxe5+, O-O, d4).",
     "- Ground every point in THIS position: name real squares, pieces and pawn structures.",
+    "- The POSITION FACTS are computed by software and are reliable. Never contradict them, and never claim a piece is hanging, pinned, attacked or defended unless the facts or the engine lines support it.",
     "- When you say why a move works, connect it to the position (material, king safety, pawn structure, piece activity).",
+    "- If a LAST MOVE REVIEW is present and the student asks about their last move or what went wrong, build your answer on it and stay consistent with it.",
     "- Earlier messages in this conversation may be about a different position. The current position above is authoritative.",
     "",
     "SCOPE & SAFETY:",
@@ -97,12 +114,12 @@ function guidelinesSection({ gm, lengthHint }) {
  * Persona + grounded position context + response rules.
  * `gm` is an entry from gmPersonalities; all other inputs must already be sanitised.
  */
-export function buildSystemPrompt({ gm, fen, moveHistory = [], topLines = [], openingName = "", lengthHint }) {
+export function buildSystemPrompt({ gm, fen, moveHistory = [], topLines = [], openingName = "", moveReview = null, lengthHint }) {
   const chess = new Chess(fen);
   return [
     gm.systemPrompt,
     "",
-    positionSection({ chess, fen, moveHistory, openingName }),
+    positionSection({ chess, fen, moveHistory, openingName, moveReview }),
     "",
     engineSection({ fen, topLines }),
     "",

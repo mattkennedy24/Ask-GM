@@ -5,7 +5,8 @@ import { Chess } from "chess.js";
  *
  * A mention only counts as "illegal" when it is playable nowhere the analysis
  * can reach: the current position, any position along the engine lines shown to
- * the model, or a move already played in the game. That keeps quoted variations
+ * the model, a move already played in the game, or an alternative at one of the
+ * last few positions of the game. That keeps quoted variations
  * ("1. e4 e5 2. Nf3") and references to past moves from being flagged, which a
  * naive "is it legal right now?" check would do on almost every answer.
  */
@@ -40,6 +41,29 @@ function addLegalMoveKeys(chess, keys) {
   for (const san of chess.moves()) keys.add(moveKey(san));
 }
 
+// How many positions back from the current one a reply may talk about ("instead of 9.Bd3 you
+// should have played 9.Be2"). Beyond that, a move that is legal nowhere near the present
+// position is far more likely to be an invention than a retrospective.
+const RECENT_PLIES = 8;
+
+const samePosition = (a, b) => a.split(" ").slice(0, 2).join(" ") === b.split(" ").slice(0, 2).join(" ");
+
+/** Legal moves from the last few positions of the game, if the move list really leads to `fen`. */
+function addRecentPastMoveKeys(fen, moveHistory, keys) {
+  const chess = new Chess();
+  const positions = [];
+  try {
+    for (const san of moveHistory) {
+      positions.push(chess.fen());
+      chess.move(san);
+    }
+  } catch {
+    return; // the list is not a legal game from the start: it says nothing reliable about the past
+  }
+  if (!samePosition(chess.fen(), fen)) return;
+  for (const before of positions.slice(-RECENT_PLIES)) addLegalMoveKeys(new Chess(before), keys);
+}
+
 /** Every move key that may legitimately be mentioned for this position and analysis. */
 export function collectAllowedMoveKeys({ fen, topLines = [], moveHistory = [] }) {
   const keys = new Set();
@@ -65,6 +89,7 @@ export function collectAllowedMoveKeys({ fen, topLines = [], moveHistory = [] })
   }
 
   for (const san of moveHistory) keys.add(moveKey(san));
+  addRecentPastMoveKeys(fen, moveHistory, keys);
   return keys;
 }
 

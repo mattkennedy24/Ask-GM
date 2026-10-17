@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
 import { collectAllowedMoveKeys, findIllegalMoveMentions, moveKey } from "../lib/moveValidation.js";
 import { parseFollowUps } from "../lib/followUps.js";
-import { toPlainText } from "../lib/plainText.js";
+import { stripEmoji, toPlainText } from "../lib/plainText.js";
 import { classifyQuestion, lengthHintFor } from "../lib/classify.js";
 import { detectOffTopic, pickDismissal } from "../lib/offTopic.js";
 
@@ -55,6 +55,23 @@ describe("findIllegalMoveMentions", () => {
     const allowed = collectAllowedMoveKeys({ fen: START_FEN, topLines });
     // Nc6 is Black's move and Bb5 is blocked at the root: only legal deeper in the line.
     expect(findIllegalMoveMentions("The main line runs 1. e4 e5 2. Nf3 Nc6 3. Bb5.", allowed)).toEqual([]);
+  });
+
+  it("allows an alternative at one of the last few positions, for retrospective advice", () => {
+    // After 1.e4 e5 2.Nf3 Nc6 the student asks "what should Black have played instead of 2...Nc6?".
+    // 2...Nf6 was legal one ply ago, but it is White's move now, so it is not legal in this position.
+    const history = ["e4", "e5", "Nf3", "Nc6"];
+    const fen = fenAfter(...history);
+    const allowed = collectAllowedMoveKeys({ fen, moveHistory: history });
+    expect(findIllegalMoveMentions("Instead of 2...Nc6 consider 2...Nf6, the Petroff.", allowed)).toEqual([]);
+    // Without the move list, the same advice cannot be verified and is flagged.
+    expect(findIllegalMoveMentions("consider 2...Nf6", collectAllowedMoveKeys({ fen }))).toEqual(["Nf6"]);
+  });
+
+  it("does not let an illegal or mismatched move list widen what counts as legal", () => {
+    const fen = fenAfter("e4", "e5");
+    expect(findIllegalMoveMentions("Nf6", collectAllowedMoveKeys({ fen, moveHistory: ["d4", "d5"] }))).toEqual(["Nf6"]);
+    expect(findIllegalMoveMentions("Nf6", collectAllowedMoveKeys({ fen, moveHistory: ["e4", "e4"] }))).toEqual(["Nf6"]);
   });
 
   it("allows references to moves already played in the game", () => {
@@ -140,6 +157,20 @@ describe("toPlainText", () => {
 
   it("does not touch snake_case or intra-word asterisks", () => {
     expect(toPlainText("use e4_e5 and a*b*c")).toBe("use e4_e5 and a*b*c");
+  });
+
+  it("removes emoji and the gap they leave, so the chat reads like a text from a person", () => {
+    expect(toPlainText("Great move \u{1F525}! Play Nf3 \u{1F44D}")).toBe("Great move! Play Nf3");
+    expect(toPlainText("\u2705 solid \u274C bad \u26A1 fast")).toBe("solid bad fast");
+    expect(toPlainText("\u{1F468}\u200D\u{1F469}\u200D\u{1F467} and \u{1F44D}\u{1F3FD} and \u{1F1F3}\u{1F1F4}")).toBe("and and");
+    expect(toPlainText("\u{1F525}")).toBe("");
+  });
+
+  it("keeps symbols that are notation or punctuation rather than decoration", () => {
+    const text = "The \u265E on f3 and the \u2654 are fine; so are \u00A9, \u2192, \u2713 and \u2605.";
+    expect(stripEmoji(text)).toBe(text);
+    // A symbol that explicitly asks to be shown as a picture is decoration.
+    expect(stripEmoji("pawn \u265F\uFE0F push")).toBe("pawn push");
   });
 });
 

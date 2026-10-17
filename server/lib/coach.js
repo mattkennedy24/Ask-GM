@@ -2,7 +2,7 @@ import { buildSystemPrompt } from "./prompt.js";
 import { lengthHintFor } from "./classify.js";
 import { collectAllowedMoveKeys, findIllegalMoveMentions } from "./moveValidation.js";
 import { parseFollowUps } from "./followUps.js";
-import { toPlainText } from "./plainText.js";
+import { stripEmoji, toPlainText } from "./plainText.js";
 import { detectOffTopic, pickDismissal, REDIRECT_FOLLOW_UPS } from "./offTopic.js";
 
 /** The model returned nothing usable (no text block, or only a follow-ups line). */
@@ -28,14 +28,17 @@ export function createCoach({ anthropic, model, personalities, maxTokens = 700, 
     const response = await anthropic.messages.create({ model, max_tokens: maxTokens, system, messages });
     const block = response.content?.find((part) => part.type === "text" && part.text?.trim());
     if (!block) throw new EmptyResponseError();
-    return parseFollowUps(block.text, { truncated: response.stop_reason === "max_tokens" });
+    // Emoji go before parsing so a trailing one cannot stop the chip cleanup from seeing the end of the line.
+    const parsed = parseFollowUps(stripEmoji(block.text), { truncated: response.stop_reason === "max_tokens" });
+    // The chips get the same treatment as the reply: no markdown, nothing left empty.
+    return { text: parsed.text, followUps: parsed.followUps.map(toPlainText).filter((item) => item.length >= 3) };
   }
 
   /**
    * @param {object} input already validated by validateChatPayload
    * @returns {Promise<{ response: string, followUps: string[], offTopic?: boolean }>}
    */
-  async function ask({ selectedGM, fen, question, history, moveHistory, topLines, openingName }) {
+  async function ask({ selectedGM, fen, question, history, moveHistory, topLines, openingName, moveReview = null }) {
     if (detectOffTopic(question)) {
       return { response: pickDismissal(selectedGM, random), followUps: REDIRECT_FOLLOW_UPS, offTopic: true };
     }
@@ -46,6 +49,7 @@ export function createCoach({ anthropic, model, personalities, maxTokens = 700, 
       moveHistory,
       topLines,
       openingName,
+      moveReview,
       lengthHint: lengthHintFor(question),
     });
     const messages = [...history, { role: "user", content: question }];

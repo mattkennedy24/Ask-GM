@@ -61,6 +61,35 @@ describe("createCoach.ask", () => {
     expect(response).toBe("Plan\nPlay e4 now.\nit is best");
   });
 
+  it("cleans markdown and emoji out of the follow-up chips as well", async () => {
+    const { coach } = makeCoach(reply("Develop.\nFOLLOWUPS: **Why Nf3?** \u{1F914} | What about e5? | ok"));
+    const { followUps } = await coach.ask(input());
+    expect(followUps).toEqual(["Why Nf3?", "What about e5?"]);
+  });
+
+  it("removes emoji from the reply itself", async () => {
+    const { coach } = makeCoach(reply("Play e4 \u{1F525}\nFOLLOWUPS: A idea | B idea | C idea"));
+    expect((await coach.ask(input())).response).toBe("Play e4");
+  });
+
+  it("puts the engine's review of the last move into the prompt, and the preferred move is not flagged as invented", async () => {
+    // 1.f3 was a mistake; the engine preferred 1.e4, which is legal one ply back but not any more.
+    const { coach, create } = makeCoach(reply("That was loose; e4 first. I would have played 1.e4.\nFOLLOWUPS: A idea | B idea | C idea"));
+    const fen = "rnbqkbnr/pppppppp/8/8/8/5P2/PPPPP1PP/RNBQKBNR b KQkq - 0 1";
+    await coach.ask(input({ fen, question: "Was my move bad?", moveHistory: ["f3"], moveReview: { quality: "mistake", lossCp: 183, bestMove: "e2e4" } }));
+    expect(create).toHaveBeenCalledTimes(1); // no corrective retry
+    expect(create.mock.calls[0][0].system).toContain("LAST MOVE REVIEW (from the engine): White's last move, 1.f3, was a mistake");
+  });
+
+  it("tells the model the game is over instead of pretending the engine is still thinking", async () => {
+    const { coach, create } = makeCoach(reply("Brutal, wasn't it.\nFOLLOWUPS: A idea | B idea | C idea"));
+    const fen = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3";
+    await coach.ask(input({ fen, topLines: [], moveHistory: ["f3", "e5", "g4", "Qh4#"], question: "What happened?" }));
+    const { system } = create.mock.calls[0][0];
+    expect(system).toMatch(/GAME OVER\. Checkmate: Black has won/);
+    expect(system).toMatch(/Do not recommend a move for either side/);
+  });
+
   it("short-circuits blatant off-topic requests without calling the model", async () => {
     const { coach, create } = makeCoach();
     const result = await coach.ask(input({ question: "write a python script to sort a list" }));

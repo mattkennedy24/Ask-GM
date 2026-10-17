@@ -142,37 +142,79 @@ function describeCastling(canKingside, canQueenside) {
   return "can no longer castle";
 }
 
-/** Where each king stands, and whether castling is still available. */
+const HOME_RANK = { w: 1, b: 8 };
+
+/**
+ * Where each king stands, and whether castling is still available.
+ *
+ * What a king's square means depends on the phase: a king walking to e4 is a
+ * liability with queens on the board and an asset in a king-and-pawn ending, so
+ * the wording changes with `getGamePhase`.
+ */
 export function getKingSafety(fen) {
   try {
     const chess = new Chess(fen);
     const rights = fen.split(" ")[2] ?? "-";
+    const endgame = getGamePhase(fen) === "endgame";
     const notes = [];
 
-    for (const [color, label, homeRank, kingside, queenside] of [
-      ["w", "White", "1", "K", "Q"],
-      ["b", "Black", "8", "k", "q"],
+    for (const [color, label, kingside, queenside] of [
+      ["w", "White", "K", "Q"],
+      ["b", "Black", "k", "q"],
     ]) {
       const [square] = chess.findPiece({ type: "k", color });
       if (!square) continue;
       const file = square[0];
-      const rank = square[1];
+      const rank = Number(square[1]);
+      const stepsFromHome = Math.abs(rank - HOME_RANK[color]);
       const canCastle = rights.includes(kingside) || rights.includes(queenside);
 
-      if (rank === homeRank && (file === "g" || file === "h")) notes.push(`${label}'s king is tucked away on the kingside.`);
-      else if (rank === homeRank && ["a", "b", "c"].includes(file)) notes.push(`${label}'s king is on the queenside.`);
-      else if (["d", "e", "f"].includes(file) && ["3", "4", "5", "6"].includes(rank)) {
-        notes.push(`${label}'s king is exposed in the center.`);
-      } else if (rank === homeRank && !canCastle) {
+      if (endgame) {
+        const centralized = "cdef".includes(file) && rank >= 3 && rank <= 6;
+        notes.push(centralized ? `${label}'s king is active in the center (${square}).` : `${label}'s king is on ${square}.`);
+      } else if (stepsFromHome >= 2) {
+        notes.push(
+          "cdef".includes(file)
+            ? `${label}'s king is exposed in the center (${square}).`
+            : `${label}'s king has walked out to ${square} and is exposed.`,
+        );
+      } else if (stepsFromHome === 1) {
+        notes.push(
+          canCastle
+            ? `${label}'s king has stepped off its back rank (${square}).`
+            : `${label}'s king has stepped off its back rank (${square}) and can no longer castle.`,
+        );
+      } else if (file === "g" || file === "h") {
+        notes.push(`${label}'s king is tucked away on the kingside.`);
+      } else if ("abc".includes(file)) {
+        notes.push(`${label}'s king is on the queenside.`);
+      } else if (!canCastle) {
         notes.push(`${label}'s king is stuck in the center and can no longer castle.`);
       }
     }
 
-    notes.push(
-      `Castling: White ${describeCastling(rights.includes("K"), rights.includes("Q"))}; Black ${describeCastling(rights.includes("k"), rights.includes("q"))}.`,
-    );
+    // In a bare ending with no rights left there is nothing to say about castling.
+    if (!endgame || /[KQkq]/.test(rights)) {
+      notes.push(
+        `Castling: White ${describeCastling(rights.includes("K"), rights.includes("Q"))}; Black ${describeCastling(rights.includes("k"), rights.includes("q"))}.`,
+      );
+    }
     return notes.join(" ");
   } catch {
     return "";
+  }
+}
+
+/** How a finished game ended, or null while it is still going. Repetition cannot be told from one position. */
+export function describeGameResult(fen) {
+  try {
+    const chess = new Chess(fen);
+    if (chess.isCheckmate()) return `Checkmate: ${chess.turn() === "w" ? "Black" : "White"} has won.`;
+    if (chess.isStalemate()) return "Stalemate: the side to move has no legal move and is not in check, so the game is drawn.";
+    if (chess.isInsufficientMaterial()) return "Draw by insufficient material: neither side can deliver checkmate.";
+    if (chess.isDrawByFiftyMoves()) return "Draw by the fifty-move rule.";
+    return null;
+  } catch {
+    return null;
   }
 }

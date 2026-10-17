@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
 import {
+  describeGameResult,
   formatEval,
   formatPvLine,
   getFileStatus,
@@ -90,13 +91,49 @@ describe("position facts", () => {
 
   it("describes king placement and remaining castling rights", () => {
     expect(getKingSafety(START_FEN)).toBe("Castling: White can castle either side; Black can castle either side.");
-    expect(getKingSafety("6k1/5ppp/8/8/8/8/5PPP/6K1 w - - 0 1")).toMatch(/tucked away on the kingside/);
+    const castled = getKingSafety("r1bq1rk1/ppp2ppp/2n2n2/3p4/3P4/2N2N2/PPP2PPP/R1BQ1RK1 w - - 0 12");
+    expect(castled).toMatch(/White's king is tucked away on the kingside/);
+    expect(castled).toMatch(/Black's king is tucked away on the kingside/);
     // Lost castling rights while still on e1: that is worth telling a student.
-    const stuck = getKingSafety("4k3/pppppppp/8/8/8/8/PPPPPPPP/4K3 w - - 0 1");
+    const stuck = getKingSafety("r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R w - - 0 5");
     expect(stuck).toMatch(/White's king is stuck in the center and can no longer castle/);
     expect(stuck).toMatch(/Castling: White can no longer castle; Black can no longer castle\./);
-    expect(getKingSafety("r3k2r/8/8/8/4K3/8/8/8 w kq - 0 1")).toMatch(/White's king is exposed in the center/);
     expect(getKingSafety("r3k2r/8/8/8/8/8/8/R3K2R w Kk - 0 1")).toMatch(/White can still castle kingside; Black can still castle kingside/);
+  });
+
+  it("calls a king that has walked out exposed while queens are on the board", () => {
+    const centre = getKingSafety("r1bq1rk1/ppp2ppp/2n2n2/3p4/3PK3/2N2N2/PPP2PPP/R1BQ3R w - - 0 12");
+    expect(centre).toMatch(/White's king is exposed in the center \(e4\)/);
+    const wing = getKingSafety("r1bq1rk1/ppp2ppp/2n2n2/3p4/3P2K1/2N2N2/PPP2PPP/R1BQ3R w - - 0 12");
+    expect(wing).toMatch(/White's king has walked out to g4 and is exposed/);
+    const stepped = getKingSafety("r1bq1rk1/ppp2ppp/2n2n2/3p4/3P4/2N2N2/PPP1KPPP/R1BQ3R w - - 0 12");
+    expect(stepped).toMatch(/White's king has stepped off its back rank \(e2\) and can no longer castle/);
+  });
+
+  it("treats a centralised king as an asset in an ending, not a weakness", () => {
+    // King-and-pawn ending: the old wording told the model both kings were "exposed in the center".
+    const ending = getKingSafety("8/5pk1/8/4K3/3P4/8/5PP1/8 w - - 0 40");
+    expect(ending).toBe("White's king is active in the center (e5). Black's king is on g7.");
+    expect(ending).not.toMatch(/exposed/i);
+    expect(getKingSafety("8/8/8/3k4/8/3K4/8/8 b - - 0 1")).toMatch(/Black's king is active in the center \(d5\)/);
+  });
+});
+
+describe("describeGameResult", () => {
+  it("names the winner of a checkmate", () => {
+    expect(describeGameResult(fenAfter("f3", "e5", "g4", "Qh4#"))).toBe("Checkmate: Black has won.");
+    expect(describeGameResult(fenAfter("e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6", "Qxf7#"))).toBe("Checkmate: White has won.");
+  });
+
+  it("recognises the drawn endings that a single position can show", () => {
+    expect(describeGameResult("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1")).toMatch(/^Stalemate/);
+    expect(describeGameResult("8/8/8/4k3/8/3K4/8/8 w - - 0 1")).toMatch(/insufficient material/);
+    expect(describeGameResult("8/8/8/4k3/8/3K4/R7/8 w - - 100 80")).toMatch(/fifty-move/);
+  });
+
+  it("is null while the game goes on, and for garbage", () => {
+    expect(describeGameResult(START_FEN)).toBeNull();
+    expect(describeGameResult("garbage")).toBeNull();
   });
 });
 
@@ -135,7 +172,11 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("Opening: King's Pawn Game");
 
     const mated = fenAfter("f3", "e5", "g4", "Qh4#");
-    expect(buildSystemPrompt({ ...base, fen: mated, topLines: [] })).toMatch(/game is OVER/);
+    const over = buildSystemPrompt({ ...base, fen: mated, topLines: [] });
+    expect(over).toMatch(/GAME OVER\. Checkmate: Black has won/);
+    expect(over).toMatch(/game is over and there are no moves left/);
+    expect(over).not.toMatch(/not available yet/);
+    expect(over).not.toMatch(/Legal moves:/);
   });
 
   it("treats the student's text as untrusted", () => {

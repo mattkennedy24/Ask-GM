@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { REVIEW_QUALITIES } from "./moveReview.js";
 
 /**
  * Input sanitisation for /api/chat.
@@ -129,6 +130,20 @@ export function sanitizeTopLines(value) {
   return lines;
 }
 
+/**
+ * The browser's verdict on the move just played. Only a fixed word, a bounded number and a UCI
+ * move survive; moveReview.js re-checks all of it against the move list before it is used.
+ */
+export function sanitizeMoveReview(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (typeof value.quality !== "string" || !REVIEW_QUALITIES.includes(value.quality)) return null;
+  return {
+    quality: value.quality,
+    lossCp: intOrNull(value.lossCp, 0, 100000) ?? 0,
+    bestMove: typeof value.bestMove === "string" && UCI_RE.test(value.bestMove) ? value.bestMove : null,
+  };
+}
+
 function normalizeRole(role) {
   if (role === "user" || role === "You") return "user";
   if (role === "assistant" || role === "GM") return "assistant";
@@ -194,6 +209,7 @@ export function validateChatPayload(body, isKnownGM) {
       moveHistory: sanitizeMoveHistory(body.moveHistory),
       topLines: sanitizeTopLines(body.topLines),
       openingName: sanitizeOpeningName(body.openingName),
+      moveReview: sanitizeMoveReview(body.moveReview),
     },
   };
 }

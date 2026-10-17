@@ -23,9 +23,9 @@ export default tseslint.config([
     },
   },
 
-  // Backend (Node, ES modules)
+  // Backend and tooling (Node, ES modules)
   {
-    files: ['server/**/*.js'],
+    files: ['server/**/*.js', 'scripts/**/*.mjs'],
     extends: [js.configs.recommended],
     languageOptions: {
       ecmaVersion: 2023,
