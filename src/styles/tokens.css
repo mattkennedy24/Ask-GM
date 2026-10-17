@@ -59,6 +59,11 @@
   --drop-shadow-*: initial;
   --blur-*: initial;
   --animate-*: initial;
+
+  /* ── Motion curves ───────────────────────────────────────────────── */
+  --ease-*: initial;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 :root {
@@ -91,9 +96,7 @@
   /* Coordinates in the corners of the squares: board artwork, so they get their own small size. */
   --fs-coord: 0.625rem;
 
-  /* Motion */
-  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Motion durations (the curves are in the theme above) */
   --dur-fast: 90ms;
   --dur-base: 160ms;
   --dur-slow: 260ms;

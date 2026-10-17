@@ -37,6 +37,7 @@ import { DESKTOP_QUERY } from "./lib/layout";
 import { kingInCheckSquare, START_FEN } from "./lib/lines";
 import { preferredSan, verdictLabel } from "./lib/moveReview";
 import { detectOpening } from "./lib/openingDetection";
+import { scrollBehavior } from "./lib/motion";
 import { gameOutcome } from "./lib/outcome";
 import { nextCritical, reviewedMoves, summarizeReview } from "./lib/reviewSummary";
 
@@ -204,7 +205,7 @@ export default function App() {
   const selectOpening = (opening: Opening) => {
     lesson.select(opening);
     // On a phone the list sits below the board; bring the board (and the stepping controls under it) back into view.
-    phonePaneRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    phonePaneRef.current?.scrollTo({ top: 0, behavior: scrollBehavior() });
     chat.addNote(selectedGM, `Studying the ${opening.name} (${opening.eco}).`, { fen: START_FEN, ply: 0, scope: `lesson:${opening.eco}:-1` });
   };
 

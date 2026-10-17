@@ -3,6 +3,7 @@ import { GMS, type GMName } from "../data/gms";
 import type { ChatMessage } from "../hooks/useChat";
 import type { ResolvedMove } from "../lib/chessMoves";
 import { tokenizeChessText } from "../lib/chessText";
+import { scrollBehavior } from "../lib/motion";
 import { ArrowRight, Check, Retry } from "./icons";
 
 interface ChatWindowProps {
@@ -60,7 +61,7 @@ export default function ChatWindow({ gm, messages, thinking, busy, onSend, onRet
   // Keep the newest message in view by scrolling the log itself (never the page).
   useEffect(() => {
     const log = logRef.current;
-    log?.scrollTo({ top: log.scrollHeight, behavior: "smooth" });
+    log?.scrollTo({ top: log.scrollHeight, behavior: scrollBehavior() });
   }, [messages.length, thinking, gm]);
 
   // Flash a check mark on the send button for a moment after sending.
