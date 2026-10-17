@@ -5,7 +5,7 @@
  * so tests can build a config from a plain object.
  */
 
-export const DEFAULT_MODEL = "claude-sonnet-4-6";
+export const DEFAULT_MODEL = "claude-sonnet-5-5";
 
 /**
  * Trim whitespace and one layer of matching wrapping quotes.

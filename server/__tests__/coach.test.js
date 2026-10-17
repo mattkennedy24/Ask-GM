@@ -50,7 +50,8 @@ describe("createCoach.ask", () => {
     expect(result).toEqual({ response: "e4, obviously.", followUps: ["Why e4?", "What next?", "Any traps?"] });
     const request = create.mock.calls[0][0];
     expect(request.model).toBe("test-model");
-    expect(request.max_tokens).toBe(700);
+    expect(request.max_tokens).toBe(8000);
+    expect(request.output_config).toEqual({ effort: "high" });
     expect(request.system).toContain("You are Magnus Carlsen");
     expect(request.system).toContain(START_FEN);
     expect(request.messages).toEqual([...history, { role: "user", content: "Best move?" }]);

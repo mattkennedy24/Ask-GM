@@ -27,9 +27,10 @@ if (!config.betaPasscode) {
 
 // The SDK retries transient failures itself (2x with backoff); the timeout keeps a
 // stalled upstream from holding a request open for the SDK's default ten minutes.
+// It is generous because a high-effort answer thinks first and can take well over 30s.
 const anthropic = new Anthropic({
   apiKey: config.anthropicApiKey || undefined,
-  timeout: 30_000,
+  timeout: 90_000,
   maxRetries: 2,
 });
 

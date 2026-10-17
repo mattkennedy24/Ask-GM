@@ -47,7 +47,7 @@ Set these in `.env` locally, or as service variables on your host. Never commit 
 | `ANTHROPIC_API_KEY` | yes | Server-side key used for `/api/chat`. Without it chat answers `503`. |
 | `BETA_PASSCODE` | no | Access code for the private beta. **If unset, the gate is disabled and the API is open to anyone with the URL** (the server logs a warning in production). Surrounding whitespace/quotes are ignored. |
 | `PORT` | no | Defaults to `3001`. Most hosts set this for you. |
-| `ANTHROPIC_MODEL` | no | Defaults to `claude-sonnet-4-6`. |
+| `ANTHROPIC_MODEL` | no | Defaults to `claude-sonnet-5-5`. |
 | `TRUST_PROXY` | no | Reverse proxies in front of the app, for correct per-client rate limiting. Defaults to `1` in production (Railway, Heroku, Render…) and off in development. |
 
 ## Scripts

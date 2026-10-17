@@ -22,11 +22,19 @@ export class EmptyResponseError extends Error {
  *
  * `anthropic` is anything with `messages.create`, so tests can inject a fake.
  */
-export function createCoach({ anthropic, model, personalities, maxTokens = 700, logger = console, random = Math.random }) {
+export function createCoach({ anthropic, model, personalities, maxTokens = 8000, logger = console, random = Math.random }) {
   const isKnownGM = (name) => Object.hasOwn(personalities, name);
 
   async function complete(system, messages) {
-    const response = await anthropic.messages.create({ model, max_tokens: maxTokens, system, messages });
+    // High effort: the model thinks before answering, and that thinking counts toward max_tokens.
+    // Reply length is set by the prompt's length hint, not by either setting.
+    const response = await anthropic.messages.create({
+      model,
+      max_tokens: maxTokens,
+      output_config: { effort: "high" },
+      system,
+      messages,
+    });
     const block = response.content?.find((part) => part.type === "text" && part.text?.trim());
     if (!block) throw new EmptyResponseError();
     // Emoji go before parsing so a trailing one cannot stop the chip cleanup from seeing the end of the line.
