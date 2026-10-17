@@ -1,91 +1,93 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import type { UnlockResult } from "../hooks/useBetaGate";
+import Dialog from "./Dialog";
 
 interface BetaKeyModalProps {
-  onSubmit: (key: string) => void;
+  /** Asks the server to verify the code; resolves with the outcome. */
+  onUnlock: (code: string) => Promise<UnlockResult>;
 }
 
-const BetaKeyModal: React.FC<BetaKeyModalProps> = ({ onSubmit }) => {
-  const [value, setValue] = useState("");
-  const [error, setError] = useState(false);
+/**
+ * Access-code prompt for the private beta. The code is checked by the server
+ * before this dialog goes away, and a wrong code says so.
+ */
+export default function BetaKeyModal({ onUnlock }: BetaKeyModalProps) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [reveal, setReveal] = useState(false);
+  const [shakeKey, setShakeKey] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const errorId = useId();
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = value.trim();
-    if (!trimmed) {
-      setError(true);
-      return;
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+
+    const result = await onUnlock(code);
+    // On success the gate closes and this component unmounts.
+    if (!result.ok) {
+      setError(result.error ?? "That access code isn't valid.");
+      setShakeKey((key) => key + 1);
+      setBusy(false);
+      inputRef.current?.focus();
+      inputRef.current?.select();
     }
-    onSubmit(trimmed);
-  };
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0, 0, 0, 0.85)", backdropFilter: "blur(4px)" }}
+    <Dialog
+      kicker={
+        <p className="wordmark" aria-hidden="true">
+          Ask <em>GM</em>
+        </p>
+      }
+      title="Private beta"
+      description="Enter your access code to talk to the grandmasters."
+      initialFocus={inputRef}
     >
-      <div
-        className="panel w-full max-w-sm p-6 flex flex-col gap-5"
-        style={{ boxShadow: "0 24px 64px rgba(0,0,0,0.8)" }}
-      >
-        {/* Header */}
-        <div className="text-center">
-          <h2
-            className="text-2xl mb-1"
-            style={{
-              fontFamily: "var(--f-serif)",
-              fontWeight: 600,
-              color: "var(--c-gold-bright)",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            Ask <em style={{ fontStyle: "italic", color: "var(--c-text)" }}>GM</em>
-          </h2>
-          <p className="text-sm" style={{ color: "var(--c-text-muted)" }}>
-            Enter your beta access code to continue
-          </p>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <form onSubmit={handleSubmit} className="stack" noValidate>
+        <div key={shakeKey} className={shakeKey > 0 ? "shake" : undefined}>
           <input
             ref={inputRef}
-            type="password"
-            value={value}
-            onChange={(e) => { setValue(e.target.value); setError(false); }}
+            type={reveal ? "text" : "password"}
+            value={code}
+            onChange={(event) => {
+              setCode(event.target.value);
+              if (error) setError(null);
+            }}
             placeholder="Access code"
+            aria-label="Access code"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
             autoComplete="off"
-            className="w-full text-sm px-4 py-3 rounded-lg focus:outline-none transition-colors text-center tracking-widest"
-            style={{
-              background: "var(--c-raised)",
-              border: `1px solid ${error ? "var(--c-gm-bobby)" : "var(--c-border-bright)"}`,
-              color: "var(--c-text)",
-              fontFamily: "var(--f-mono)",
-              letterSpacing: "0.2em",
-            }}
-            onFocus={(e) => {
-              if (!error) e.currentTarget.style.borderColor = "var(--c-gold)";
-            }}
-            onBlur={(e) => {
-              if (!error) e.currentTarget.style.borderColor = "var(--c-border-bright)";
-            }}
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="go"
+            disabled={busy}
+            className="field code-input"
+            data-reveal={reveal ? "" : undefined}
           />
-          {error && (
-            <p className="text-xs text-center" style={{ color: "var(--c-gm-bobby)" }}>
-              Please enter an access code
-            </p>
-          )}
-          <button type="submit" className="btn-primary w-full py-2.5 text-sm">
-            Enter
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-};
+        </div>
 
-export default BetaKeyModal;
+        <p id={errorId} role="alert" className="type-small error">
+          {error}
+        </p>
+
+        <button type="submit" disabled={busy || code.trim() === ""} className="btn btn-primary">
+          {busy ? "Checking…" : "Enter"}
+        </button>
+        <button type="button" onClick={() => setReveal((value) => !value)} className="btn btn-quiet">
+          {reveal ? "Hide code" : "Show code"}
+        </button>
+      </form>
+    </Dialog>
+  );
+}

@@ -25,3 +25,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright
+test-results/
+playwright-report/
+
+# Claude Code: local session notes, kept out of git (see .claude/session-log/README.md)
+.claude/session-log/

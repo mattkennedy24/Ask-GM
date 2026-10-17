@@ -1,0 +1,135 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Design tokens — the single source of truth for how Ask GM looks.
+
+   Rules (enforced by src/styles/design-system.test.ts):
+   • Type: only the roles in components.css (type-display … type-label). No other font sizes.
+   • Colour: only the tokens below. No hex or rgb() values in components.
+   • Flat: no shadows, blurs or gradients. Depth comes from rules (borders) and paper tones.
+   • Shape: a tile (8px), a small chip (4px) and a pill. Nothing else.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* `static` keeps every token in the output even when only CSS (not a utility class) uses it. */
+@theme static {
+  /* ── Typefaces ───────────────────────────────────────────────────────
+     Newsreader (a news serif) is the voice of the coaches and of headlines.
+     Libre Franklin (a Franklin Gothic) carries everything you press or scan. */
+  --font-*: initial;
+  --font-serif: "Newsreader Variable", "Newsreader", Georgia, "Times New Roman", serif;
+  --font-sans: "Libre Franklin Variable", "Libre Franklin", "Franklin Gothic Medium", "Helvetica Neue", Arial, sans-serif;
+
+  /* Sizes, weights, tracking and leading are applied through the type-* roles, never by utility. */
+  --text-*: initial;
+  --font-weight-*: initial;
+  --tracking-*: initial;
+  --leading-*: initial;
+
+  /* ── Paper and ink ─────────────────────────────────────────────────── */
+  --color-*: initial;
+  --color-paper: #faf8f2; /* the page */
+  --color-paper-2: #f1eee3; /* tiles, the player's own messages, hover */
+  --color-paper-3: #e5e0d0; /* pressed, tracks, skeletons */
+  --color-surface: #ffffff; /* fields and dialogs */
+  --color-ink: #1a1915; /* text, primary buttons, strong rules */
+  --color-ink-2: #4a473d; /* secondary text */
+  --color-ink-3: #6b6759; /* captions (4.5:1 on paper and paper-2 only) */
+  --color-rule: #d9d4c5; /* hairlines */
+
+  /* ── Meaning, not decoration ───────────────────────────────────────
+     Yellow marks where we are (last move, selection). Blue marks what the engine suggests.
+     Red marks danger (check, a blunder, an error). Nothing else is coloured. */
+  --color-marker: #ffd90f;
+  --color-engine: #2f78c4;
+  --color-engine-wash: #cfe5f7;
+  --color-danger: #b8372a;
+
+  /* ── The coaches' printing inks (text-safe on paper) ─────────────── */
+  --color-magnus: #2f5d8a;
+  --color-hikaru: #a6501a;
+  --color-bobby: #8b2a38;
+
+  /* ── Shape ───────────────────────────────────────────────────────── */
+  --radius-*: initial;
+  --radius-tile: 8px;
+  --radius-small: 4px;
+  --radius-pill: 999px;
+
+  /* ── Flat: these utilities do not exist ───────────────────────────── */
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --blur-*: initial;
+  --animate-*: initial;
+
+  /* ── Motion curves ───────────────────────────────────────────────── */
+  --ease-*: initial;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+:root {
+  /* Type scale: six sizes. */
+  --fs-label: 0.75rem;
+  --fs-small: 0.875rem;
+  --fs-body: 1rem;
+  --fs-lead: 1.125rem;
+  --fs-title: 1.375rem;
+  --fs-display: 2rem;
+
+  /* Type roles: weight, size / line-height, family. Components use these (or the .type-* classes), nothing else. */
+  --type-display: 700 var(--fs-display) / 1.1 var(--font-serif);
+  --type-title: 600 var(--fs-title) / 1.2 var(--font-serif);
+  --type-lead: 400 var(--fs-lead) / 1.5 var(--font-serif);
+  --type-body: 400 var(--fs-body) / 1.5 var(--font-sans);
+  --type-ui: 600 var(--fs-small) / 1.25 var(--font-sans);
+  --type-small: 400 var(--fs-small) / 1.4 var(--font-sans);
+  --type-label: 700 var(--fs-label) / 1 var(--font-sans);
+  --type-monogram: italic 600 var(--fs-small) / 1 var(--font-serif);
+  --type-wordmark: 700 var(--fs-title) / 1 var(--font-serif);
+
+  /* The board. These two squares and the three overlays are mirrored in src/lib/boardTheme.ts. */
+  --board-light: #f0e9d4;
+  --board-dark: #b5a98c;
+  --board-last-move: rgba(255, 217, 15, 0.55);
+  --board-selected: rgba(255, 217, 15, 0.85);
+  --board-check: rgba(184, 55, 42, 0.62);
+
+  /* Coordinates in the corners of the squares: board artwork, so they get their own small size. */
+  --fs-coord: 0.625rem;
+
+  /* Motion durations (the curves are in the theme above) */
+  --dur-fast: 90ms;
+  --dur-base: 160ms;
+  --dur-slow: 260ms;
+
+  /* Active coach; switched by [data-gm] on the app shell. --gm-wash is a tint for backgrounds. */
+  --gm: var(--color-magnus);
+
+  /* Board edge on laptops: as tall as the window allows, within sensible bounds. */
+  --board-size: clamp(300px, calc(100dvh - 19rem), 40rem);
+}
+
+/* Laptops, and phones or tablets on their side. Written out in full (and kept in step with DESKTOP_QUERY in
+   src/lib/layout.ts and the `desk` variant in src/index.css) because Tailwind's `@variant desk` keeps only the
+   first condition of a query list when it is used inside a rule. */
+@media (min-width: 1024px), (orientation: landscape) and (min-width: 700px) {
+  :root {
+    --fs-coord: 0.75rem;
+  }
+}
+
+/* A phone on its side has almost no height: the board takes what is left once the chrome is slimmed down. */
+@media (max-height: 520px) {
+  :root {
+    --board-size: clamp(160px, calc(100dvh - 11.5rem), 40rem);
+  }
+}
+
+[data-gm="Magnus"] {
+  --gm: var(--color-magnus);
+}
+[data-gm="Hikaru"] {
+  --gm: var(--color-hikaru);
+}
+[data-gm="Bobby"] {
+  --gm: var(--color-bobby);
+}

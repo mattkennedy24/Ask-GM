@@ -1,103 +1,65 @@
-import React, { useMemo } from "react";
-import { Chess } from "chess.js";
+import { useMemo } from "react";
+import type { PieceCode } from "../data/pieceArt";
+import { type CapturableType, summarizeMaterial } from "../lib/material";
+import PieceIcon from "./PieceIcon";
 
-// Piece values for material advantage calculation
-const PIECE_VALUES: Record<string, number> = {
-  p: 1, n: 3, b: 3, r: 5, q: 9, k: 0,
-};
-
-// Unicode chess symbols — always use filled/solid variants for both colors;
-// CSS color + stroke distinguishes white vs black pieces on a dark background.
-const PIECE_SYMBOLS: Record<string, string> = {
-  q: "♛", r: "♜", b: "♝", n: "♞", p: "♟",
-};
-
-// Starting piece counts per color
-const STARTING: Record<string, number> = { p: 8, n: 2, b: 2, r: 2, q: 1 };
-const PIECE_ORDER = ["q", "r", "b", "n", "p"] as const;
-
-function computeCaptured(fen: string) {
-  const chess = new Chess(fen);
-  const onBoard: Record<string, Record<string, number>> = {
-    w: { p: 0, n: 0, b: 0, r: 0, q: 0 },
-    b: { p: 0, n: 0, b: 0, r: 0, q: 0 },
-  };
-
-  for (const row of chess.board()) {
-    for (const piece of row) {
-      if (piece && piece.type !== "k") {
-        onBoard[piece.color][piece.type]++;
-      }
-    }
-  }
-
-  // Pieces captured BY white = missing black pieces
-  const capturedByWhite: string[] = [];
-  // Pieces captured BY black = missing white pieces
-  const capturedByBlack: string[] = [];
-  let materialAdvantage = 0;
-
-  for (const type of PIECE_ORDER) {
-    const missingBlack = STARTING[type] - onBoard.b[type];
-    const missingWhite = STARTING[type] - onBoard.w[type];
-    for (let i = 0; i < missingBlack; i++) capturedByWhite.push(type);
-    for (let i = 0; i < missingWhite; i++) capturedByBlack.push(type);
-    materialAdvantage += (missingBlack - missingWhite) * PIECE_VALUES[type];
-  }
-
-  return { capturedByWhite, capturedByBlack, materialAdvantage };
-}
+const NAMES: Record<CapturableType, string> = { q: "queen", r: "rook", b: "bishop", n: "knight", p: "pawn" };
 
 interface CapturedPiecesProps {
   fen: string;
-  /** "top" = shown above board (black's captures of white pieces; from black's side) */
-  side: "top" | "bottom";
+  /**
+   * Whether the pieces that are missing were really captured. That is only true when the game began from the
+   * starting position; a position pasted from a FEN just has fewer pieces, so only the material lead is shown.
+   */
+  known: boolean;
+  /** The board is flipped: Black's captures go on the left, nearest the player at the bottom. */
+  flipped: boolean;
 }
 
-const CapturedPieces: React.FC<CapturedPiecesProps> = ({ fen, side }) => {
-  const { capturedByWhite, capturedByBlack, materialAdvantage } = useMemo(
-    () => computeCaptured(fen),
-    [fen]
-  );
+function Side({ fen, capturedBy, known }: { fen: string; capturedBy: "w" | "b"; known: boolean }) {
+  const { pieces, lead } = useMemo(() => {
+    const summary = summarizeMaterial(fen);
+    const mine = capturedBy === "w" ? summary.capturedByWhite : summary.capturedByBlack;
+    const ahead = capturedBy === "w" ? summary.advantage : -summary.advantage;
+    return { pieces: mine, lead: ahead > 0 ? ahead : 0 };
+  }, [fen, capturedBy]);
 
-  // "top" row shows captures made by Black (white pieces taken)
-  // "bottom" row shows captures made by White (black pieces taken)
-  const pieces = side === "top" ? capturedByBlack : capturedByWhite;
-
-  // Material advantage sign: positive = white ahead, negative = black ahead
-  const showAdvantage =
-    side === "bottom" && materialAdvantage > 0
-      ? `+${materialAdvantage}`
-      : side === "top" && materialAdvantage < 0
-      ? `+${Math.abs(materialAdvantage)}`
-      : null;
-
-  // White pieces: cream fill with dark shadow for definition
-  // Black pieces: near-black fill with light outline so they're visible on dark bg
-  const pieceStyle: React.CSSProperties =
-    side === "top"
-      ? { color: "#f0d9b5", textShadow: "0 0 2px #000, 0 0 4px #000" }
-      : { color: "#1a1a1a", WebkitTextStroke: "0.8px #aaa" };
+  // The figurine is drawn in the colour of the piece that was taken, not of the side that took it.
+  const taken = capturedBy === "w" ? "b" : "w";
+  const side = capturedBy === "w" ? "White" : "Black";
+  const description = !known
+    ? lead > 0
+      ? `${side} is ahead by ${lead}`
+      : side
+    : pieces.length > 0
+      ? `${side} has captured: ${pieces.map((p) => NAMES[p]).join(", ")}`
+      : `${side} has captured nothing`;
 
   return (
-    <div className="flex items-center gap-1.5 min-h-[20px] px-1">
-      <span className="text-base leading-none tracking-tighter">
-        {pieces.map((type, i) => (
-          <span key={i} style={pieceStyle}>
-            {PIECE_SYMBOLS[type]}
-          </span>
+    <div className="captured" role="img" aria-label={description}>
+      <span className="type-label muted" aria-hidden="true">
+        {side}
+      </span>
+      <span className="captured-pieces" aria-hidden="true">
+        {(known ? pieces : []).map((type, i) => (
+          <PieceIcon key={i} piece={`${taken}${type.toUpperCase()}` as PieceCode} className="captured-piece" />
         ))}
       </span>
-      {showAdvantage && (
-        <span
-          className="text-xs font-semibold tabular-nums"
-          style={{ color: "var(--c-gold)", fontFamily: "var(--f-mono)" }}
-        >
-          {showAdvantage}
+      {lead > 0 && (
+        <span className="type-small num soft" aria-hidden="true">
+          +{lead}
         </span>
       )}
     </div>
   );
-};
+}
 
-export default CapturedPieces;
+/** What each side has taken, in one row under the board. */
+export default function CapturedPieces({ fen, known, flipped }: CapturedPiecesProps) {
+  return (
+    <div className="captures">
+      <Side fen={fen} known={known} capturedBy={flipped ? "b" : "w"} />
+      <Side fen={fen} known={known} capturedBy={flipped ? "w" : "b"} />
+    </div>
+  );
+}

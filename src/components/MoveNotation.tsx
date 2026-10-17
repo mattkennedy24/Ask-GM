@@ -1,157 +1,77 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
+import { type MoveVerdict, verdictGlyph, verdictLabel } from "../lib/moveReview";
 
 interface MoveNotationProps {
+  /** Every move of the line in SAN, including any beyond the position on screen. */
   sanMoves: string[];
-  currentIndex: number;
+  /** How each move was judged, aligned with `sanMoves` (null while unknown). */
+  verdicts: (MoveVerdict | null)[];
+  /** Position on screen: 0 = start, n = after n plies. */
+  index: number;
   onNavigate: (index: number) => void;
 }
 
-interface MovePair {
-  number: number;
-  white: { san: string; index: number } | null;
-  black: { san: string; index: number } | null;
-}
-
-function buildPairs(sanMoves: string[]): MovePair[] {
-  const pairs: MovePair[] = [];
-  for (let i = 0; i < sanMoves.length; i += 2) {
-    pairs.push({
-      number: Math.floor(i / 2) + 1,
-      white: { san: sanMoves[i], index: i + 1 },
-      black: sanMoves[i + 1] !== undefined ? { san: sanMoves[i + 1], index: i + 2 } : null,
-    });
-  }
-  return pairs;
-}
-
-const MoveNotation: React.FC<MoveNotationProps> = ({ sanMoves, currentIndex, onNavigate }) => {
+/** The move list as numbered pairs. Click a move to jump to the position after it. */
+export default function MoveNotation({ sanMoves, verdicts, index, onNavigate }: MoveNotationProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const activeRef = useRef<HTMLButtonElement>(null);
 
+  // Keep the current move visible by scrolling the list itself. (scrollIntoView would also scroll the
+  // page, which on a phone yanks the board out of view.)
   useEffect(() => {
-    if (activeRef.current && containerRef.current) {
-      activeRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const container = containerRef.current;
+    const current = container?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!container || !current) return;
+    const top = current.offsetTop - container.offsetTop;
+    if (top < container.scrollTop) container.scrollTop = top;
+    else if (top + current.offsetHeight > container.scrollTop + container.clientHeight) {
+      container.scrollTop = top + current.offsetHeight - container.clientHeight;
     }
-  }, [currentIndex]);
+  }, [index, sanMoves.length]);
 
   if (sanMoves.length === 0) {
-    return (
-      <div
-        className="flex items-center justify-center py-2 text-xs"
-        style={{ color: "var(--c-text-muted)", fontFamily: "var(--f-mono)" }}
-      >
-        No moves yet
-      </div>
-    );
+    return <p className="type-small muted moves-empty">No moves yet. Make a move on the board.</p>;
   }
 
-  const pairs = buildPairs(sanMoves);
+  const pairs: { number: number; white: string; black: string | null }[] = [];
+  for (let i = 0; i < sanMoves.length; i += 2) {
+    pairs.push({ number: i / 2 + 1, white: sanMoves[i], black: sanMoves[i + 1] ?? null });
+  }
+
+  const moveButton = (san: string, plyIndex: number) => {
+    const verdict = verdicts[plyIndex - 1] ?? null;
+    const glyph = verdict ? verdictGlyph(verdict.quality) : "";
+    return (
+      <button
+        type="button"
+        onClick={() => onNavigate(plyIndex)}
+        aria-current={index === plyIndex ? "true" : undefined}
+        aria-label={verdict && glyph ? `${san}, ${verdictLabel(verdict.quality).toLowerCase()}` : san}
+        className="move-chip num"
+      >
+        {san}
+        {glyph && (
+          <span className={`mark mark-${verdict?.quality}`} aria-hidden="true">
+            {glyph}
+          </span>
+        )}
+      </button>
+    );
+  };
 
   return (
-    <div
-      ref={containerRef}
-      className="flex flex-wrap gap-x-0.5 gap-y-0.5 overflow-y-auto"
-      style={{ maxHeight: "5rem", scrollbarWidth: "none" }}
-    >
-      {/* Start position button */}
-      <button
-        onClick={() => onNavigate(0)}
-        className="text-xs px-1.5 py-0.5 rounded transition-all duration-100"
-        style={
-          currentIndex === 0
-            ? {
-                background: "var(--c-gold-dim)",
-                color: "var(--c-gold-bright)",
-                border: "1px solid var(--c-gold)",
-                fontFamily: "var(--f-mono)",
-              }
-            : {
-                color: "var(--c-text-muted)",
-                border: "1px solid transparent",
-                fontFamily: "var(--f-mono)",
-              }
-        }
-      >
-        ⊙
+    <div ref={containerRef} role="group" aria-label="Moves" className="moves">
+      <button type="button" onClick={() => onNavigate(0)} aria-current={index === 0 ? "true" : undefined} aria-label="Starting position" className="move-chip">
+        Start
       </button>
-
       {pairs.map((pair) => (
-        <React.Fragment key={pair.number}>
-          {/* Move number */}
-          <span
-            className="text-xs self-center tabular-nums select-none px-0.5"
-            style={{ color: "var(--c-text-muted)", fontFamily: "var(--f-mono)" }}
-          >
+        <span key={pair.number} className="move-pair">
+          <span className="move-number type-small num muted" aria-hidden="true">
             {pair.number}.
           </span>
-
-          {/* White move */}
-          {pair.white && (
-            <MoveButton
-              san={pair.white.san}
-              index={pair.white.index}
-              currentIndex={currentIndex}
-              onNavigate={onNavigate}
-              activeRef={currentIndex === pair.white.index ? activeRef : undefined}
-            />
-          )}
-
-          {/* Black move */}
-          {pair.black && (
-            <MoveButton
-              san={pair.black.san}
-              index={pair.black.index}
-              currentIndex={currentIndex}
-              onNavigate={onNavigate}
-              activeRef={currentIndex === pair.black.index ? activeRef : undefined}
-            />
-          )}
-        </React.Fragment>
+          {moveButton(pair.white, pair.number * 2 - 1)}
+          {pair.black !== null && moveButton(pair.black, pair.number * 2)}
+        </span>
       ))}
     </div>
   );
-};
-
-interface MoveButtonProps {
-  san: string;
-  index: number;
-  currentIndex: number;
-  onNavigate: (index: number) => void;
-  activeRef?: React.Ref<HTMLButtonElement>;
 }
-
-const MoveButton: React.FC<MoveButtonProps> = ({ san, index, currentIndex, onNavigate, activeRef }) => {
-  const isActive = currentIndex === index;
-
-  return (
-    <button
-      ref={activeRef}
-      onClick={() => onNavigate(index)}
-      className="text-xs px-1.5 py-0.5 rounded"
-      style={{
-        background: isActive ? "var(--c-gold-dim)" : "transparent",
-        color: isActive ? "var(--c-gold-bright)" : "var(--c-text-soft)",
-        border: `1px solid ${isActive ? "var(--c-gold)" : "transparent"}`,
-        fontFamily: "var(--f-mono)",
-        transition: "background 100ms ease, color 100ms ease, border-color 100ms ease",
-        fontWeight: isActive ? 600 : 400,
-      }}
-      onMouseEnter={(e) => {
-        if (!isActive) {
-          (e.currentTarget as HTMLButtonElement).style.background = "var(--c-hover)";
-          (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isActive) {
-          (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-          (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text-soft)";
-        }
-      }}
-    >
-      {san}
-    </button>
-  );
-};
-
-export default MoveNotation;

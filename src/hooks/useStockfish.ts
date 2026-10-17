@@ -1,167 +1,110 @@
-import { useEffect, useRef, useCallback, useState } from "react";
-
-export type EngineLineResult = {
-  pv: string[];
-  score: number | null;
-  mate: number | null;
-};
-
-const MULTI_PV = 3;
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MULTI_PV, UciAnalyzer } from "../engine/analyzer";
+import { fetchCloudEval } from "../engine/lichess";
+import { createEngineWorker } from "../engine/worker";
+import type { EngineLine } from "../engine/uci";
 
 /**
- * Lichess cloud evaluation API — returns top N lines.
+ * "starting" – the worker is loading
+ * "ready"    – analysing locally with Stockfish
+ * "fallback" – the worker is unavailable; using Lichess's cloud cache instead
  */
-async function fetchLichessEval(fen: string): Promise<EngineLineResult[]> {
-  try {
-    const encoded = encodeURIComponent(fen);
-    const res = await fetch(
-      `https://lichess.org/api/cloud-eval?fen=${encoded}&multiPv=${MULTI_PV}`
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!data.pvs || data.pvs.length === 0) return [];
+export type EngineStatus = "starting" | "ready" | "fallback";
 
-    return data.pvs.map((pv: { moves?: string; cp?: number; mate?: number }) => {
-      const pvLine: string[] = pv.moves ? pv.moves.split(" ") : [];
-      let score: number | null = null;
-      let mate: number | null = null;
-      if (pv.cp !== undefined) score = pv.cp;
-      else if (pv.mate !== undefined) {
-        mate = pv.mate;
-        score = pv.mate > 0 ? 9999 : -9999;
-      }
-      return { pv: pvLine, score, mate };
-    });
-  } catch {
-    return [];
-  }
+export interface EngineState {
+  /** The position `lines` belong to (null until the first request). */
+  fen: string | null;
+  lines: EngineLine[];
+  thinking: boolean;
+  status: EngineStatus;
 }
+
+const INITIAL: EngineState = { fen: null, lines: [], thinking: false, status: "starting" };
 
 /**
- * Parse a Stockfish WASM "info" line for score and PV.
- * Example: "info depth 20 multipv 1 score cp 35 ... pv e2e4 e7e5 g1f3"
+ * Runs Stockfish in a Web Worker and exposes the latest analysis.
+ *
+ * Call `analyze(fen)` whenever the position changes. Results are only ever
+ * published for the most recently requested position, so a slow search for a
+ * position you have already left can never overwrite the current one.
  */
-function parseInfoLine(msg: string): { score: number | null; mate: number | null; pv: string[] } {
-  let score: number | null = null;
-  let mate: number | null = null;
-
-  const cpMatch = msg.match(/score cp (-?\d+)/);
-  const mateMatch = msg.match(/score mate (-?\d+)/);
-
-  if (cpMatch) score = parseInt(cpMatch[1], 10);
-  else if (mateMatch) {
-    mate = parseInt(mateMatch[1], 10);
-    score = mate > 0 ? 9999 : -9999;
-  }
-
-  const pvMatch = msg.match(/ pv (.+?)(?:\s+(?:bm|multipv|string|currmove)\b|$)/);
-  const pv = pvMatch ? pvMatch[1].trim().split(/\s+/) : [];
-
-  return { score, mate, pv };
-}
-
 export function useStockfish() {
-  const stockfishRef = useRef<{ postMessage: (msg: string) => void; terminate?: () => void } | null>(null);
-  const [topLines, setTopLines] = useState<EngineLineResult[]>([]);
-  const [thinking, setThinking] = useState(false);
-  const [usingFallback, setUsingFallback] = useState(false);
-  const wasmFailed = useRef(false);
+  const [state, setState] = useState<EngineState>(INITIAL);
+  const analyzerRef = useRef<UciAnalyzer | null>(null);
+  const wantedRef = useRef<string | null>(null);
+  const fallbackRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // Per-multipv accumulator: key = multipv index (1-based)
-  const bestInfoMapRef = useRef<Map<number, { score: number | null; mate: number | null; pv: string[] }>>(new Map());
+  const runFallback = useCallback(async (fen: string) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
-  // Backwards-compatible derived values from topLines[0]
-  const firstLine = topLines[0] ?? null;
-  const bestMove = firstLine?.pv[0] ?? null;
-  const evalScore = firstLine?.score ?? null;
-  const mateIn = firstLine?.mate ?? null;
-  const pvLine = firstLine?.pv ?? [];
+    const lines = await fetchCloudEval(fen, MULTI_PV, controller.signal);
+    if (controller.signal.aborted || wantedRef.current !== fen) return;
+    setState((s) => ({ ...s, fen, lines, thinking: false }));
+  }, []);
 
   useEffect(() => {
-    if (wasmFailed.current) return;
+    let cancelled = false;
+    let analyzer: UciAnalyzer | null = null;
+
+    const switchToFallback = () => {
+      if (cancelled) return;
+      analyzerRef.current = null;
+      fallbackRef.current = true;
+      setState((s) => ({ ...s, status: "fallback" }));
+      if (wantedRef.current) void runFallback(wantedRef.current);
+    };
 
     try {
-      import("stockfish")
-        .then((mod) => {
-          try {
-            const sf = mod.default();
-            sf.onmessage = (event: string | { data: string }) => {
-              const msg: string = typeof event === "string" ? event : (event?.data ?? "");
-              if (typeof msg !== "string") return;
-
-              if (msg.startsWith("info") && msg.includes("score")) {
-                // Extract which PV line this info belongs to (defaults to 1 when MultiPV not set)
-                const multipvMatch = msg.match(/\bmultipv (\d+)/);
-                const multipvIdx = multipvMatch ? parseInt(multipvMatch[1], 10) : 1;
-                const parsed = parseInfoLine(msg);
-                if (parsed.score !== null || parsed.mate !== null) {
-                  bestInfoMapRef.current.set(multipvIdx, parsed);
-                }
-              }
-
-              if (msg.startsWith("bestmove")) {
-                const move = msg.split(" ")[1];
-                const map = bestInfoMapRef.current;
-
-                const lines: EngineLineResult[] = Array.from(map.entries())
-                  .sort(([a], [b]) => a - b)
-                  .map(([, info]) => ({ score: info.score, mate: info.mate, pv: info.pv }))
-                  .filter((l) => l.pv.length > 0);
-
-                // Fallback: if map is empty, at least use the bestmove
-                if (lines.length === 0 && move && move !== "(none)") {
-                  lines.push({ score: null, mate: null, pv: [move] });
-                }
-
-                setTopLines(lines);
-                setThinking(false);
-              }
-            };
-            stockfishRef.current = sf;
-            sf.postMessage("uci");
-          } catch {
-            console.warn("Stockfish WASM init failed — will use Lichess fallback");
-            wasmFailed.current = true;
-            setUsingFallback(true);
-          }
-        })
-        .catch(() => {
-          console.warn("Stockfish WASM import failed — will use Lichess fallback");
-          wasmFailed.current = true;
-          setUsingFallback(true);
-        });
-    } catch {
-      console.warn("Stockfish WASM not available — will use Lichess fallback");
-      wasmFailed.current = true;
-      setUsingFallback(true);
+      const worker = createEngineWorker();
+      analyzer = new UciAnalyzer(worker, {
+        onReady: () => {
+          if (!cancelled) setState((s) => ({ ...s, status: "ready" }));
+        },
+        onUpdate: (update) => {
+          if (cancelled || update.fen !== wantedRef.current) return;
+          setState((s) => ({ ...s, fen: update.fen, lines: update.lines, thinking: update.thinking }));
+        },
+        onError: (message) => {
+          console.warn(`Stockfish unavailable (${message}); falling back to Lichess cloud evaluations.`);
+          switchToFallback();
+        },
+      });
+      analyzerRef.current = analyzer;
+      // A position may have been requested before the worker existed (first render, StrictMode remount).
+      if (wantedRef.current) analyzer.analyze(wantedRef.current);
+    } catch (error) {
+      console.warn("Could not start the Stockfish worker; using Lichess cloud evaluations.", error);
+      switchToFallback();
     }
 
     return () => {
-      if (stockfishRef.current && typeof stockfishRef.current.terminate === "function") {
-        stockfishRef.current.terminate();
-      }
+      cancelled = true;
+      analyzer?.dispose();
+      analyzerRef.current = null;
+      abortRef.current?.abort();
     };
-  }, []);
+  }, [runFallback]);
 
-  const analyzePosition = useCallback(async (fen: string, depth = 18) => {
-    setThinking(true);
-    setTopLines([]);
-    bestInfoMapRef.current = new Map();
+  const analyze = useCallback(
+    (fen: string) => {
+      wantedRef.current = fen;
+      setState((s) => ({ ...s, fen, lines: [], thinking: true }));
+      if (analyzerRef.current) analyzerRef.current.analyze(fen);
+      else if (fallbackRef.current) void runFallback(fen);
+      // Otherwise the worker is still being created; the effect above picks up wantedRef.
+    },
+    [runFallback],
+  );
 
-    if (stockfishRef.current && !wasmFailed.current) {
-      stockfishRef.current.postMessage("stop");
-      stockfishRef.current.postMessage("ucinewgame");
-      stockfishRef.current.postMessage(`setoption name MultiPV value ${MULTI_PV}`);
-      stockfishRef.current.postMessage(`position fen ${fen}`);
-      stockfishRef.current.postMessage(`go depth ${depth}`);
-      return;
-    }
-
-    setUsingFallback(true);
-    const lines = await fetchLichessEval(fen);
-    setTopLines(lines);
-    setThinking(false);
-  }, []);
-
-  return { bestMove, evalScore, mateIn, pvLine, topLines, analyzePosition, thinking, usingFallback };
+  const top = state.lines[0];
+  return {
+    ...state,
+    analyze,
+    bestMove: top?.pv[0] ?? null,
+    evalScore: top?.score ?? null,
+    mateIn: top?.mate ?? null,
+  };
 }
