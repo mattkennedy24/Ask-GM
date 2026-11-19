@@ -32,3 +32,6 @@ playwright-report/
 
 # Claude Code: local session notes, kept out of git (see .claude/session-log/README.md)
 .claude/session-log/
+
+# /brag working files (frames, captures, scripts)
+brag-output/work/

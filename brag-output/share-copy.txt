@@ -1,0 +1,5 @@
+Bxf7+ looked brilliant. Ask GM called it a blunder in under a second, then an AI grandmaster explained why in plain English: a whole bishop for one pawn, and the king is perfectly safe.
+
+Ask GM: Stockfish runs live in your browser, every move gets a verdict, and you can ask an AI grandmaster about any position. Now in private beta.
+
+Music and video made with /brag. Piece art: cburnett (CC BY-SA 3.0).
