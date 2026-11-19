@@ -26,4 +26,4 @@ Paper `#faf8f2`, ink `#1a1915`, rule `#d9d4c5`, marker yellow `#ffd90f`, engine 
 | 2 Reveal | 6–11 | 3.75–6.875 | Dip through paper. Wordmark **Ask *GM***, rule, "Ask an AI grandmaster why." | Bell motif; bass enters |
 | 3 Ask | 11–25 | 6.875–15.625 | "Ask why. Get a straight answer." Real chat: the question is typed (beats 12–15) and sent (beat 15); the answer lands on beat 16 with **d3** marked; held 5.6 s | Kick and hats; soft send tick; chime on the answer |
 | 4 Grounded | 25–31 | 15.625–19.375 | "Grounded in Stockfish, live in your browser." The move list with Bxf7+?? in red, then the three real engine lines, one per beat | A soft tick per line |
-| 5 Outro | 31–36 | 19.375–22.5 | Ask *GM* / "Chess coaching from AI grandmasters." / PRIVATE BETA | Final D chord, fades out |
+| 5 Outro | 31–36 | 19.375–22.5 | Ask *GM* / "Chess coaching from AI grandmasters." / askgm.up.railway.app / PRIVATE BETA | Final D chord, fades out |
